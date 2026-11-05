@@ -11,8 +11,102 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <!-- Estilos separados -->
   <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* PANTALLA DE ACCESO / LOGIN SIMPLE */
+    #adminAuthOverlay {
+      position: fixed;
+      inset: 0;
+      background: #070c18;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .auth-card {
+      background: #111827;
+      border: 1.5px solid #1e293b;
+      border-radius: 16px;
+      padding: 32px 26px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+    }
+    .auth-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+    .auth-sub {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    .auth-input {
+      width: 100%;
+      background: #0b1120;
+      border: 1.5px solid #334155;
+      color: #ffffff;
+      padding: 13px 14px;
+      border-radius: 10px;
+      font-size: 1.15rem;
+      text-align: center;
+      letter-spacing: 4px;
+      margin-bottom: 14px;
+      box-sizing: border-box;
+    }
+    .auth-input:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+    .auth-btn {
+      width: 100%;
+      padding: 13px;
+      background: #2563eb;
+      border: none;
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .auth-btn:hover {
+      background: #1d4ed8;
+    }
+    .auth-error {
+      color: #f87171;
+      font-size: 0.82rem;
+      margin-top: 12px;
+      display: none;
+    }
+  </style>
 </head>
 <body>
+  <!-- BLOQUEO POR PIN / LOGIN SIMPLE -->
+  <div id="adminAuthOverlay">
+    <div class="auth-card">
+      <div style="font-size: 2rem; margin-bottom: 8px;">🔐</div>
+      <div class="auth-title">Acceso al Panel de Control</div>
+      <div class="auth-sub">Ingresá el PIN de seguridad para continuar</div>
+      <form onsubmit="submitAdminLogin(event)">
+        <input
+          type="password"
+          id="adminPinInput"
+          class="auth-input"
+          placeholder="••••"
+          autocomplete="current-password"
+          autofocus
+        />
+        <button type="submit" class="auth-btn">Ingresar</button>
+      </form>
+      <div id="authErrorMsg" class="auth-error">PIN incorrecto</div>
+    </div>
+  </div>
+
   <div class="container">
     <!-- ENCABEZADO PRINCIPAL -->
     <header class="app-header">
@@ -665,6 +759,42 @@
   <div id="toast" class="toast"></div>
 
   <!-- SCRIPTS MODULARES SEPARADOS -->
+  <script>
+    // Sistema simple de PIN para ocultar el verificador si alguien entra al link principal
+    const ADMIN_PIN_SECRET = '991'; // Tu PIN para entrar
+    const AUTH_SESSION_KEY = 'admin_session_auth_v1';
+
+    function checkAdminAuth() {
+      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const overlay = document.getElementById('adminAuthOverlay');
+      if (overlay) {
+        overlay.style.display = isAuth ? 'none' : 'flex';
+      }
+      if (!isAuth) {
+        setTimeout(() => {
+          const pin = document.getElementById('adminPinInput');
+          if (pin) pin.focus();
+        }, 100);
+      }
+    }
+
+    function submitAdminLogin(e) {
+      e.preventDefault();
+      const pinVal = document.getElementById('adminPinInput').value.trim();
+      const errEl = document.getElementById('authErrorMsg');
+      if (pinVal === ADMIN_PIN_SECRET || pinVal === '+991') {
+        sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+        document.getElementById('adminAuthOverlay').style.display = 'none';
+        showToast('🔓 Acceso concedido');
+      } else {
+        if (errEl) errEl.style.display = 'block';
+        document.getElementById('adminPinInput').value = '';
+        document.getElementById('adminPinInput').focus();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAdminAuth);
+  </script>
   <script src="js/state.js"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/parsers.js"></script>
