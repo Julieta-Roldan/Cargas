@@ -212,6 +212,7 @@
                   </div>
                   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button class="btn btn-primary" id="btnSyncSupabase" onclick="syncSupabaseMovimientos(false)">🔄 Traer Cargas Ahora</button>
+                    <button class="btn btn-outline" onclick="openTrashModal()" style="border-color: #f87171; color: #fca5a5;" title="Ver movimientos borrados por las trabajadoras">🗑️ Ver Papelera</button>
                     <a href="cargas.html" class="btn btn-outline" style="text-decoration: none;">⚡ Abrir Cargas.html ↗</a>
                   </div>
                 </div>
@@ -221,10 +222,15 @@
             <!-- MODO GOOGLE SHEETS EN VIVO (POR DEFECTO) -->
             <div id="excelGsheetContainer">
               <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
-                <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">
-                  Enlace de Google Sheets conectado:
-                </label>
-                <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                  <label style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                    Enlace de Google Sheets conectado:
+                  </label>
+                  <button type="button" class="btn btn-outline" onclick="toggleSecondGsheetUrl()" style="padding: 2px 8px; font-size: 0.72rem; border-color: #38bdf8; color: #7dd3fc;">
+                    ➕ Agregar 2do Link de Sheets (Opcional)
+                  </button>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
                   <input
                     type="text"
                     id="gsheetUrlInput"
@@ -237,6 +243,24 @@
                   <button class="btn btn-outline" onclick="openGoogleSheetInTab()" title="Abrir Google Sheets en otra pestaña">
                     ↗️ Abrir Hoja
                   </button>
+                </div>
+
+                <!-- 2DO ENLACE DE GOOGLE SHEETS OPCIONAL (POR SI CREAN OTRO ARCHIVO DISTINTO) -->
+                <div id="secondGsheetUrlBox" style="display: none; margin-bottom: 10px; padding-top: 8px; border-top: 1px dashed var(--border);">
+                  <label style="display: block; font-size: 0.74rem; color: #7dd3fc; margin-bottom: 5px; font-weight: 600;">
+                    2do Enlace de Google Sheets (se unifica con el primero):
+                  </label>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <input
+                      type="text"
+                      id="gsheetUrlInput2"
+                      placeholder="Pega aquí otro link de Google Sheets si crearon un documento nuevo..."
+                      style="flex: 1; min-width: 220px; font-family: 'Consolas', monospace; font-size: 0.8rem;"
+                    />
+                    <button type="button" class="btn btn-outline" onclick="clearSecondGsheetUrl()" style="padding: 6px 10px; font-size: 0.76rem;">
+                      ✕ Quitar 2do Link
+                    </button>
+                  </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.83rem;">
@@ -267,16 +291,66 @@
               ></textarea>
             </div>
 
-            <!-- BARRA DE METADATOS / SELECTOR DE HOJA -->
-            <div class="excel-meta" id="excelMetaBar" style="display: none;">
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <span>📄 <strong id="fileNameLabel">Control_GoogleSheets.xlsx</strong></span>
-                <label id="sheetSelectorWrap" style="display: none; font-size: 0.84rem; color: var(--text-muted);">
-                  Pestaña/Hoja:
-                  <select id="sheetSelect" onchange="onSheetChange()"></select>
-                </label>
+            <!-- BARRA DE METADATOS / SELECTOR DE RANGO DE HOJAS Y FILAS -->
+            <div class="excel-meta" id="excelMetaBar" style="display: none; flex-direction: column; align-items: stretch; gap: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span>📄 <strong id="fileNameLabel">Control_GoogleSheets.xlsx</strong></span>
+                  <div id="quickSheetButtons" style="display: inline-flex; gap: 6px; flex-wrap: wrap;"></div>
+                  <!-- Select oculto de compatibilidad -->
+                  <span id="sheetSelectorWrap" style="display: none;">
+                    <select id="sheetSelect" onchange="onSheetChange()"></select>
+                  </span>
+                </div>
+                <span id="excelCountBadge" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">0 registros</span>
               </div>
-              <span id="excelCountBadge" style="font-size: 0.8rem; color: var(--text-muted);">0 registros</span>
+
+              <!-- CONTROLES DE DESDE QUÉ HOJA A QUÉ HOJA Y DESDE QUÉ FILA A QUÉ FILA -->
+              <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.8rem;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="color: #38bdf8; font-weight: 800;">🎯 Rango a tomar:</span>
+
+                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                    Desde Hoja:
+                    <select id="sheetStartSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600;"></select>
+                  </label>
+
+                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                    Fila #:
+                    <input
+                      type="number"
+                      id="rowStartInput"
+                      min="1"
+                      placeholder="1 (Inicio)"
+                      oninput="onRangeOrSheetChange()"
+                      style="width: 86px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
+                    />
+                  </label>
+
+                  <span style="color: #64748b; font-weight: 800;">➔</span>
+
+                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                    Hasta Hoja:
+                    <select id="sheetEndSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600;"></select>
+                  </label>
+
+                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                    Fila #:
+                    <input
+                      type="number"
+                      id="rowEndInput"
+                      min="1"
+                      placeholder="Última"
+                      oninput="onRangeOrSheetChange()"
+                      style="width: 86px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
+                    />
+                  </label>
+                </div>
+
+                <button type="button" class="btn btn-outline" onclick="resetSheetAndRowRange()" style="padding: 4px 10px; font-size: 0.76rem;" title="Agarrar todas las hojas desde la fila 1 hasta la última">
+                  🔄 Agarrar Todo
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -777,6 +851,49 @@
     </div>
   </div>
 
+  <!-- ========================================================= -->
+  <!-- MODAL DE PAPELERA DE RECICLAJE (SUPABASE)                 -->
+  <!-- ========================================================= -->
+  <div class="modal-backdrop" id="trashModalBackdrop" onclick="handleTrashBackdropClick(event)">
+    <div class="modal-card" style="max-width: 720px; border-color: #ef4444;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">🗑️</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #fca5a5;">Papelera de Movimientos Borrados</h3>
+            <p style="margin: 0; font-size: 0.78rem; color: var(--text-muted);">
+              Movimientos que las operadoras borraron desde su celular. Podés restaurarlos con 1 clic.
+            </p>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeTrashModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px; max-height: 380px; overflow-y: auto;">
+        <div id="trashLoading" style="text-align: center; padding: 20px; color: var(--text-muted);">
+          Cargando papelera...
+        </div>
+        <table id="trashTable" style="width: 100%; border-collapse: collapse; display: none;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--text-muted); text-align: left;">
+              <th style="padding: 8px;">HORA / DÍA</th>
+              <th style="padding: 8px;">TIPO</th>
+              <th style="padding: 8px;">USUARIO</th>
+              <th style="padding: 8px; text-align: right;">MONTO</th>
+              <th style="padding: 8px;">DETALLE / BORRADO</th>
+              <th style="padding: 8px; text-align: center;">ACCIÓN</th>
+            </tr>
+          </thead>
+          <tbody id="trashTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+        <button class="btn btn-outline" onclick="closeTrashModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
 
   <!-- SCRIPTS MODULARES SEPARADOS -->
@@ -933,6 +1050,93 @@
     }
 
     window.addEventListener('DOMContentLoaded', checkAdminAuth);
+
+    // FUNCIONES DE LA PAPELERA
+    let currentTrashItems = [];
+
+    async function openTrashModal() {
+      const backdrop = document.getElementById('trashModalBackdrop');
+      backdrop.classList.add('open');
+      await loadTrashMovimientos();
+    }
+
+    function closeTrashModal() {
+      document.getElementById('trashModalBackdrop').classList.remove('open');
+    }
+
+    function handleTrashBackdropClick(e) {
+      if (e.target.id === 'trashModalBackdrop') {
+        closeTrashModal();
+      }
+    }
+
+    async function loadTrashMovimientos() {
+      const loading = document.getElementById('trashLoading');
+      const table = document.getElementById('trashTable');
+      const tbody = document.getElementById('trashTbody');
+
+      loading.style.display = 'block';
+      table.style.display = 'none';
+
+      const { url, key } = getSupabaseCredentials();
+      try {
+        const res = await fetch(`${url}/rest/v1/movimientos?borrado=eq.true&order=id.desc`, {
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+        });
+        currentTrashItems = await res.json();
+
+        loading.style.display = 'none';
+        table.style.display = 'table';
+
+        if (!Array.isArray(currentTrashItems) || currentTrashItems.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                La papelera está vacía. No hay movimientos borrados.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = currentTrashItems.map(item => {
+          const isRetiro = item.tipo === 'RETIRO';
+          const typeBadge = isRetiro
+            ? '<span style="background:rgba(249,115,22,0.2); color:#fb923c; padding:2px 6px; border-radius:4px; font-size:0.72rem; font-weight:700;">RETIRO</span>'
+            : '<span style="background:rgba(16,185,129,0.2); color:#34d399; padding:2px 6px; border-radius:4px; font-size:0.72rem; font-weight:700;">CARGA</span>';
+
+          return `
+            <tr style="border-bottom: 1px solid var(--border); font-size: 0.85rem;">
+              <td style="padding: 9px; font-family: monospace;">${escapeHtml(item.hora || '--:--')} (${escapeHtml(item.fecha_dia || '')})</td>
+              <td style="padding: 9px;">${typeBadge}</td>
+              <td style="padding: 9px; font-weight: 700; color: #fff;">${escapeHtml(item.usuario)}</td>
+              <td style="padding: 9px; text-align: right; font-family: monospace; font-weight: 700; color: ${isRetiro ? '#fb923c' : '#34d399'};">
+                $ ${Number(item.monto || 0).toLocaleString('es-AR')}
+              </td>
+              <td style="padding: 9px; font-size: 0.78rem; color: #fca5a5;">${escapeHtml(item.editado_hora || 'Borrado')}</td>
+              <td style="padding: 9px; text-align: center;">
+                <button class="btn btn-outline" onclick="restoreTrashItem('${escapeHtml(item.id)}')" style="padding: 4px 8px; font-size: 0.75rem; border-color: #34d399; color: #34d399;">
+                  ♻️ Restaurar
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        loading.innerHTML = `<span style="color:#f87171;">Error al cargar papelera: ${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    async function restoreTrashItem(id) {
+      try {
+        await restoreMovimientoInDB(id);
+        showToast('♻️ Movimiento restaurado');
+        await loadTrashMovimientos();
+        syncSupabaseMovimientos(true);
+      } catch (err) {
+        alert(err.message);
+      }
+    }
   </script>
   <script src="js/parsers.js"></script>
   <script src="js/matcher.js"></script>

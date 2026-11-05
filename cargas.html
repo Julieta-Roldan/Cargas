@@ -140,10 +140,128 @@
       color: #cbd5e1;
       font-family: 'Consolas', monospace;
     }
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.25);
-      color: #cbd5e1;
+    /* LISTA SIMPLE DE MOVIMIENTOS RECIENTES */
+    .mini-history-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .mini-history-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mini-history-list {
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .mini-history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+      cursor: pointer;
+      transition: background 0.12s ease;
+      user-select: none;
+    }
+    .mini-history-item:hover {
+      background: #1e293b;
+    }
+    .mini-history-item:last-child {
+      border-bottom: none;
+    }
+    .mini-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mini-badge {
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 3px 7px;
+      border-radius: 5px;
+      text-transform: uppercase;
+    }
+    .mini-badge-carga {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .mini-badge-retiro {
+      background: rgba(249, 115, 22, 0.18);
+      color: #fb923c;
+      border: 1px solid rgba(249, 115, 22, 0.35);
+    }
+    .mini-user {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .mini-info-sub {
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+    .mini-item-right {
+      text-align: right;
+    }
+    .mini-amount {
+      font-size: 1rem;
+      font-weight: 800;
       font-family: 'Consolas', monospace;
+    }
+    .mini-amount-carga {
+      color: #34d399;
+    }
+    .mini-amount-retiro {
+      color: #fb923c;
+    }
+    .mini-empty {
+      padding: 20px;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.82rem;
+    }
+
+    /* SELECTOR TIPO EN MODAL EDICION */
+    .tipo-switch-wrap {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .tipo-switch-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1.5px solid #334155;
+      background: #0b1120;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .tipo-switch-btn.active-carga {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+    .tipo-switch-btn.active-retiro {
+      border-color: #f97316;
+      background: rgba(249, 115, 22, 0.2);
+      color: #fb923c;
     }
 
     /* RESUMEN RÁPIDO */
@@ -387,6 +505,17 @@
         <span class="giant-kbd">Atajo: Tecla 2</span>
       </button>
     </div>
+
+    <!-- LISTA SIMPLE DE MOVIMIENTOS RECIENTES (TOCAR PARA EDITAR O BORRAR) -->
+    <div class="mini-history-card">
+      <div class="mini-history-header">
+        <span>Movimientos Recientes</span>
+        <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">(Tocar para editar o borrar)</span>
+      </div>
+      <div class="mini-history-list" id="miniHistoryList">
+        <div class="mini-empty">Cargando movimientos...</div>
+      </div>
+    </div>
   </div>
 
   <!-- ========================================================= -->
@@ -408,6 +537,16 @@
       <form id="quickForm" onsubmit="submitQuickForm(event)" autocomplete="off">
         <input type="hidden" id="qmEditId" value="" />
         <input type="hidden" id="qmTipo" value="DEPOSITO" />
+
+        <!-- SELECTOR DE TIPO (CARGA O RETIRO) AL EDITAR O CREAR -->
+        <div class="tipo-switch-wrap" id="tipoSwitchRow">
+          <button type="button" class="tipo-switch-btn active-carga" id="btnSwitchCarga" onclick="setModalTipo('DEPOSITO')">
+            Carga
+          </button>
+          <button type="button" class="tipo-switch-btn" id="btnSwitchRetiro" onclick="setModalTipo('RETIRO')">
+            Retiro
+          </button>
+        </div>
 
         <!-- CAMPO 1: USUARIO -->
         <div class="qm-field">
@@ -448,8 +587,16 @@
           <div class="wallet-chips" id="walletChipsContainer"></div>
         </div>
 
+        <!-- HISTORIAL DE EDICIÓN (SI YA FUE EDITADO ANTES) -->
+        <div id="qmHistoryAlert" style="display: none; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: #7dd3fc; margin-bottom: 12px;"></div>
+
         <button type="submit" class="qm-submit-btn qm-submit-carga" id="qmSubmitBtn">
           Guardar Carga (Enter)
+        </button>
+
+        <!-- BOTÓN ELIMINAR / MANDAR A PAPELERA (SOLO VISIBLE AL EDITAR) -->
+        <button type="button" id="qmDeleteBtn" onclick="deleteCurrentEditItem()" style="display: none; width: 100%; margin-top: 8px; padding: 10px; background: transparent; border: 1px solid #ef4444; color: #f87171; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+          Borrar Movimiento
         </button>
       </form>
     </div>
@@ -617,32 +764,47 @@ create policy "Acceso publico total movimientos"
       document.getElementById('qmAutoClock').textContent = `${dt.hora} hs · Fecha ${dt.fechaDia}`;
     }
 
-    function openQuickModal(tipo, editItem = null) {
-      const backdrop = document.getElementById('quickModalBackdrop');
+    function setModalTipo(nuevoTipo) {
       const box = document.getElementById('quickModalBox');
       const titleEl = document.getElementById('qmTitle');
       const billeteraWrap = document.getElementById('qmBilleteraWrap');
       const billeteraInput = document.getElementById('qmBilletera');
       const submitBtn = document.getElementById('qmSubmitBtn');
+      const btnCarga = document.getElementById('btnSwitchCarga');
+      const btnRetiro = document.getElementById('btnSwitchRetiro');
+      const editId = document.getElementById('qmEditId').value;
 
-      document.getElementById('qmTipo').value = tipo;
-      document.getElementById('qmEditId').value = editItem ? editItem.id : '';
+      document.getElementById('qmTipo').value = nuevoTipo;
 
-      if (tipo === 'RETIRO') {
+      if (nuevoTipo === 'RETIRO') {
         box.className = 'quick-modal mode-retiro';
-        titleEl.textContent = editItem ? 'EDITAR RETIRO' : 'NUEVO RETIRO';
+        btnCarga.className = 'tipo-switch-btn';
+        btnRetiro.className = 'tipo-switch-btn active-retiro';
+        titleEl.textContent = editId ? 'EDITAR RETIRO' : 'NUEVO RETIRO';
         billeteraWrap.style.display = 'block';
         billeteraInput.required = true;
         submitBtn.className = 'qm-submit-btn qm-submit-retiro';
-        submitBtn.textContent = editItem ? 'GUARDAR CAMBIOS (ENTER)' : 'REGISTRAR RETIRO (ENTER)';
+        submitBtn.textContent = editId ? 'GUARDAR CAMBIOS (ENTER)' : 'REGISTRAR RETIRO (ENTER)';
       } else {
         box.className = 'quick-modal mode-carga';
-        titleEl.textContent = editItem ? 'EDITAR CARGA' : 'NUEVA CARGA';
+        btnCarga.className = 'tipo-switch-btn active-carga';
+        btnRetiro.className = 'tipo-switch-btn';
+        titleEl.textContent = editId ? 'EDITAR CARGA' : 'NUEVA CARGA';
         billeteraWrap.style.display = 'none';
         billeteraInput.required = false;
         submitBtn.className = 'qm-submit-btn qm-submit-carga';
-        submitBtn.textContent = editItem ? 'GUARDAR CAMBIOS (ENTER)' : 'GUARDAR CARGA (ENTER)';
+        submitBtn.textContent = editId ? 'GUARDAR CAMBIOS (ENTER)' : 'GUARDAR CARGA (ENTER)';
       }
+    }
+
+    function openQuickModal(tipo, editItem = null) {
+      const backdrop = document.getElementById('quickModalBackdrop');
+      const billeteraInput = document.getElementById('qmBilletera');
+      const historyAlert = document.getElementById('qmHistoryAlert');
+      const deleteBtn = document.getElementById('qmDeleteBtn');
+
+      document.getElementById('qmEditId').value = editItem ? editItem.id : '';
+      setModalTipo(tipo);
 
       document.getElementById('qmUsuario').value = editItem ? editItem.usuario : '';
       document.getElementById('qmMonto').value = editItem ? editItem.monto : '';
@@ -650,7 +812,17 @@ create policy "Acceso publico total movimientos"
 
       if (editItem) {
         document.getElementById('qmAutoClock').textContent = `${editItem.hora} hs · Fecha ${editItem.fecha_dia}`;
+        deleteBtn.style.display = 'block';
+
+        if (editItem.editado_hora) {
+          historyAlert.style.display = 'block';
+          historyAlert.textContent = `Última modificación: ${editItem.editado_hora}`;
+        } else {
+          historyAlert.style.display = 'none';
+        }
       } else {
+        deleteBtn.style.display = 'none';
+        historyAlert.style.display = 'none';
         updateAutoClockDisplay();
         clearInterval(clockInterval);
         clockInterval = setInterval(updateAutoClockDisplay, 5000);
@@ -660,6 +832,32 @@ create policy "Acceso publico total movimientos"
       setTimeout(() => {
         document.getElementById('qmUsuario').focus();
       }, 40);
+    }
+
+    async function deleteCurrentEditItem() {
+      const editId = document.getElementById('qmEditId').value;
+      const usuario = document.getElementById('qmUsuario').value;
+      if (!editId) return;
+
+      if (!confirm(`¿Borrar movimiento de "${usuario}"? Se enviará a la papelera.`)) {
+        return;
+      }
+
+      const btn = document.getElementById('qmDeleteBtn');
+      btn.disabled = true;
+      btn.textContent = 'Enviando a papelera...';
+
+      try {
+        await softDeleteMovimientoInDB(editId);
+        showToast(`🗑️ Movimiento de ${usuario} enviado a papelera`);
+        closeQuickModal();
+        await loadMovimientos();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Borrar Movimiento';
+      }
     }
 
     function closeQuickModal() {
@@ -734,10 +932,47 @@ create policy "Acceso publico total movimientos"
     async function loadMovimientos() {
       const dt = getCurrentDateAndTime();
       try {
-        const res = await fetchMovimientosFromDB(dt.fechaDia);
+        const res = await fetchMovimientosFromDB(dt.fechaDia, false);
         currentMovimientos = res.data || [];
         updateKnownUsersDatalist();
-      } catch (err) {}
+        renderMiniHistory();
+      } catch (err) {
+        const el = document.getElementById('miniHistoryList');
+        if (el) el.innerHTML = `<div class="mini-empty" style="color:#f87171;">Sin conexión</div>`;
+      }
+    }
+
+    function renderMiniHistory() {
+      const listEl = document.getElementById('miniHistoryList');
+      if (!listEl) return;
+
+      if (!currentMovimientos || currentMovimientos.length === 0) {
+        listEl.innerHTML = `<div class="mini-empty">No hay movimientos cargados hoy</div>`;
+        return;
+      }
+
+      listEl.innerHTML = currentMovimientos.map(m => {
+        const isRetiro = m.tipo === 'RETIRO';
+        const badgeClass = isRetiro ? 'mini-badge-retiro' : 'mini-badge-carga';
+        const amountClass = isRetiro ? 'mini-amount-retiro' : 'mini-amount-carga';
+        const editNotice = m.editado_hora ? `· <span style="color:#38bdf8;">Editado</span>` : '';
+        const walletNotice = (isRetiro && m.billetera) ? `(${escapeHtml(m.billetera)})` : '';
+
+        return `
+          <div class="mini-history-item" onclick="editMovimiento('${escapeHtml(m.id)}')">
+            <div class="mini-item-left">
+              <span class="mini-badge ${badgeClass}">${isRetiro ? 'Retiro' : 'Carga'}</span>
+              <div>
+                <div class="mini-user">${escapeHtml(m.usuario)} <span style="font-size:0.75rem; color:#94a3b8; font-weight:normal;">${walletNotice}</span></div>
+                <div class="mini-info-sub">${escapeHtml(m.hora || '--:--')} ${editNotice}</div>
+              </div>
+            </div>
+            <div class="mini-item-right">
+              <div class="mini-amount ${amountClass}">$ ${Number(m.monto || 0).toLocaleString('es-AR')}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function updateKnownUsersDatalist() {
