@@ -305,51 +305,85 @@
                 <span id="excelCountBadge" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">0 registros</span>
               </div>
 
-              <!-- CONTROLES DE DESDE QUÉ HOJA A QUÉ HOJA Y DESDE QUÉ FILA A QUÉ FILA -->
-              <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.8rem;">
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span style="color: #38bdf8; font-weight: 800;">🎯 Rango a tomar:</span>
+              <!-- CONTROLES DE DESDE QUÉ HOJA A QUÉ HOJA, FILAS Y HORARIO -->
+              <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="color: #38bdf8; font-weight: 800;">🎯 Rango de Hojas y Filas:</span>
+
+                    <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                      Desde Hoja:
+                      <select id="sheetStartSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600; min-width: 95px;">
+                        <option value="Hoja 1">Hoja 1</option>
+                      </select>
+                    </label>
+
+                    <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                      Fila #:
+                      <input
+                        type="number"
+                        id="rowStartInput"
+                        list="excelRowSuggestions"
+                        min="1"
+                        placeholder="1 (Inicio)"
+                        oninput="onRangeOrSheetChange()"
+                        style="width: 95px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
+                      />
+                    </label>
+
+                    <span style="color: #64748b; font-weight: 800;">➔</span>
+
+                    <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                      Hasta Hoja:
+                      <select id="sheetEndSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600; min-width: 95px;">
+                        <option value="Hoja 1">Hoja 1</option>
+                      </select>
+                    </label>
+
+                    <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
+                      Fila #:
+                      <input
+                        type="number"
+                        id="rowEndInput"
+                        list="excelRowSuggestions"
+                        min="1"
+                        placeholder="Última"
+                        oninput="onRangeOrSheetChange()"
+                        style="width: 95px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
+                      />
+                    </label>
+                    <datalist id="excelRowSuggestions"></datalist>
+                  </div>
+
+                  <button type="button" class="btn btn-outline" onclick="resetSheetAndRowRange()" style="padding: 4px 10px; font-size: 0.76rem;" title="Agarrar todas las hojas, filas y horarios">
+                    🔄 Agarrar Todo
+                  </button>
+                </div>
+
+                <!-- FILTRO DE HORARIO (DESDE QUÉ HORA HASTA QUÉ HORA) -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed rgba(51, 65, 85, 0.7);">
+                  <span style="color: #a78bfa; font-weight: 800;">⏰ Rango de Horario:</span>
 
                   <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
-                    Desde Hoja:
-                    <select id="sheetStartSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600;"></select>
-                  </label>
-
-                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
-                    Fila #:
-                    <input
-                      type="number"
-                      id="rowStartInput"
-                      min="1"
-                      placeholder="1 (Inicio)"
-                      oninput="onRangeOrSheetChange()"
-                      style="width: 86px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
-                    />
+                    Desde Hora:
+                    <select id="timeStartSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-family: 'Consolas', monospace; font-weight: 600; min-width: 110px;">
+                      <option value="">00:00 (Inicio)</option>
+                    </select>
                   </label>
 
                   <span style="color: #64748b; font-weight: 800;">➔</span>
 
                   <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
-                    Hasta Hoja:
-                    <select id="sheetEndSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: 600;"></select>
+                    Hasta Hora:
+                    <select id="timeEndSelect" onchange="onRangeOrSheetChange()" style="background: #0b1120; border: 1px solid #334155; color: #f8fafc; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-family: 'Consolas', monospace; font-weight: 600; min-width: 110px;">
+                      <option value="">23:59 (Final)</option>
+                    </select>
                   </label>
 
-                  <label style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted);">
-                    Fila #:
-                    <input
-                      type="number"
-                      id="rowEndInput"
-                      min="1"
-                      placeholder="Última"
-                      oninput="onRangeOrSheetChange()"
-                      style="width: 86px; background: #0b1120; border: 1px solid #334155; color: #fbbf24; border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; font-family: 'Consolas', monospace; font-weight: 700;"
-                    />
-                  </label>
+                  <span style="font-size: 0.73rem; color: var(--text-muted);">
+                    (Filtra tanto la Planilla como el Panel entre esos horarios)
+                  </span>
                 </div>
-
-                <button type="button" class="btn btn-outline" onclick="resetSheetAndRowRange()" style="padding: 4px 10px; font-size: 0.76rem;" title="Agarrar todas las hojas desde la fila 1 hasta la última">
-                  🔄 Agarrar Todo
-                </button>
               </div>
             </div>
           </div>
@@ -1138,10 +1172,639 @@
       }
     }
   </script>
-  <script src="js/parsers.js"></script>
-  <script src="js/matcher.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/pdf.js"></script>
-  <script src="js/tour.js"></script>
+  <script src="js/parsers.js?v=20261105"></script>
+  <script src="js/matcher.js?v=20261105"></script>
+  <script src="js/ui.js?v=20261105"></script>
+  <script src="js/pdf.js?v=20261105"></script>
+  <script src="js/tour.js?v=20261105"></script>
+  <script>
+    // =========================================================
+    // PARCHE AUTO-CONTENIDO PARA MULTI-HOJA, RANGO DE FILAS,
+    // RANGO DE HORARIO Y PAPELERA SUPABASE (Funciona directo al subir index.html)
+    // =========================================================
+    AppState.googleSheetUrl2 = AppState.googleSheetUrl2 || '';
+    AppState.sheetStartName = AppState.sheetStartName || '';
+    AppState.sheetEndName = AppState.sheetEndName || '';
+    AppState.rowStartFilter = AppState.rowStartFilter || null;
+    AppState.rowEndFilter = AppState.rowEndFilter || null;
+    AppState.timeStartFilter = AppState.timeStartFilter || '';
+    AppState.timeEndFilter = AppState.timeEndFilter || '';
+    AppState.userSetSheetRange = AppState.userSetSheetRange || false;
+
+    function formatExcelRowRef(e) {
+      if (!e) return '—';
+      const multiSheets = AppState.currentWorkbook && AppState.currentWorkbook.SheetNames && AppState.currentWorkbook.SheetNames.length > 1;
+      if (e.sheetName && multiSheets) {
+        return `${e.sheetName} · Fila #${e.excelRowNumber}`;
+      }
+      return `Fila #${e.excelRowNumber}`;
+    }
+
+    function parseTimeStrToMinutes(tStr) {
+      if (!tStr) return null;
+      const m = String(tStr).trim().match(/(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      const hh = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      if (isNaN(hh) || isNaN(mm)) return null;
+      return hh * 60 + mm;
+    }
+
+    function isMinutesWithinRange(mins, minStart, maxEnd) {
+      if (minStart === null && maxEnd === null) return true;
+      if (mins === null || mins === undefined || isNaN(mins)) return true;
+      const s = minStart !== null ? minStart : 0;
+      const e = maxEnd !== null ? maxEnd : 1439;
+      if (s <= e) return mins >= s && mins <= e;
+      return mins >= s || mins <= e;
+    }
+
+    function getActivePanelItems() {
+      const activeDay = getResolvedActiveDay();
+      const minT = parseTimeStrToMinutes(AppState.timeStartFilter);
+      const maxT = parseTimeStrToMinutes(AppState.timeEndFilter);
+      const base = activeDay === 'all'
+        ? AppState.panelItems
+        : AppState.panelItems.filter(p => p.fechaDia === activeDay || p.fechaDia === 'Sin fecha');
+      if (minT === null && maxT === null) return base;
+      return base.filter(p => isMinutesWithinRange(p.minutesOfDay, minT, maxT));
+    }
+
+    function getActiveExcelItems() {
+      const activeDay = getResolvedActiveDay();
+      const minT = parseTimeStrToMinutes(AppState.timeStartFilter);
+      const maxT = parseTimeStrToMinutes(AppState.timeEndFilter);
+      const base = activeDay === 'all'
+        ? AppState.excelItems
+        : AppState.excelItems.filter(e => e.fechaDia === activeDay || e.fechaDia === 'Sin fecha');
+      if (minT === null && maxT === null) return base;
+      return base.filter(e => {
+        const mins = e.hora ? parseTimeStrToMinutes(e.hora) : null;
+        return isMinutesWithinRange(mins, minT, maxT);
+      });
+    }
+
+    async function updateMovimientoInDB(id, changes) {
+      const { url, key, isConfigured } = getSupabaseCredentials();
+      const dt = getCurrentDateAndTime();
+      const finalChanges = {
+        ...changes,
+        editado_hora: changes.editado_hora || `${dt.hora} (${dt.fechaDia})`
+      };
+      if (isConfigured) {
+        const endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}`;
+        const res = await fetch(endpoint, {
+          method: 'PATCH',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(finalChanges)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`No se pudo actualizar en Supabase: ${errText}`);
+        }
+        const updated = await res.json();
+        return { source: 'supabase', item: Array.isArray(updated) ? updated[0] : updated };
+      }
+      throw new Error('Supabase no configurado');
+    }
+
+    async function restoreMovimientoInDB(id) {
+      const dt = getCurrentDateAndTime();
+      return updateMovimientoInDB(id, {
+        borrado: false,
+        editado_hora: `Restaurado a las ${dt.hora} (${dt.fechaDia})`
+      });
+    }
+
+    function toggleSecondGsheetUrl() {
+      const box = document.getElementById('secondGsheetUrlBox');
+      if (!box) return;
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function clearSecondGsheetUrl() {
+      const inp = document.getElementById('gsheetUrlInput2');
+      if (inp) inp.value = '';
+      const box = document.getElementById('secondGsheetUrlBox');
+      if (box) box.style.display = 'none';
+      syncGoogleSheet(false);
+    }
+
+    async function syncGoogleSheet(silent = false) {
+      const urlInput = document.getElementById('gsheetUrlInput');
+      const url = urlInput ? urlInput.value.trim() : AppState.googleSheetUrl;
+      AppState.googleSheetUrl = url;
+
+      const urlInput2 = document.getElementById('gsheetUrlInput2');
+      const url2 = urlInput2 ? urlInput2.value.trim() : '';
+      AppState.googleSheetUrl2 = url2;
+
+      const sheetId = extractGoogleSheetId(url);
+      if (!sheetId) {
+        showToast('⚠️ El link de Google Sheets no es válido');
+        return;
+      }
+
+      const syncBtn = document.getElementById('btnSyncGsheet');
+      const statusEl = document.getElementById('gsheetStatusText');
+      if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '⏳ Sincronizando...';
+      }
+      if (statusEl) {
+        statusEl.textContent = 'Conectando con Google Sheets en vivo...';
+      }
+
+      try {
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&t=${Date.now()}`;
+        const response = await fetch(exportUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        const mainWb = XLSX.read(data, { type: 'array' });
+
+        const sheetId2 = extractGoogleSheetId(url2);
+        if (sheetId2 && sheetId2 !== sheetId) {
+          try {
+            const exportUrl2 = `https://docs.google.com/spreadsheets/d/${sheetId2}/export?format=xlsx&t=${Date.now()}`;
+            const res2 = await fetch(exportUrl2);
+            if (res2.ok) {
+              const ab2 = await res2.arrayBuffer();
+              const wb2 = XLSX.read(new Uint8Array(ab2), { type: 'array' });
+              wb2.SheetNames.forEach(sName => {
+                let targetName = `Link2 · ${sName}`;
+                if (mainWb.SheetNames.includes(targetName)) {
+                  targetName = `Link2_${Date.now()} · ${sName}`;
+                }
+                mainWb.SheetNames.push(targetName);
+                mainWb.Sheets[targetName] = wb2.Sheets[sName];
+              });
+            }
+          } catch (e2) {
+            console.warn('No se pudo cargar el 2do link de Google Sheets:', e2);
+          }
+        }
+
+        AppState.currentWorkbook = mainWb;
+        AppState.currentFileName = 'Control_GoogleSheets.xlsx';
+
+        populateSheetSelector();
+        onSheetChange();
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        AppState.lastSyncTime = timeStr;
+
+        const totalSheets = mainWb.SheetNames.length;
+        if (statusEl) {
+          statusEl.innerHTML = `🟢 Conectado en vivo (${totalSheets} hoja${totalSheets > 1 ? 's' : ''}) · Actualizado: <strong>${timeStr}</strong> (${AppState.excelItems.length} mov.)`;
+        }
+        if (!silent) {
+          showToast(`🔄 Google Sheets sincronizado (${AppState.excelItems.length} movimientos en ${totalSheets} hoja${totalSheets > 1 ? 's' : ''})`);
+        }
+      } catch (err) {
+        syncGoogleSheetViaJsonp(sheetId, silent);
+      } finally {
+        if (syncBtn) {
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = '🔄 Sincronizar Ahora';
+        }
+      }
+    }
+
+    function populateTimeAndRowSelectors(items = []) {
+      const tStart = document.getElementById('timeStartSelect');
+      const tEnd = document.getElementById('timeEndSelect');
+      const rowList = document.getElementById('excelRowSuggestions');
+
+      const timeSet = new Set();
+      for (let h = 0; h < 24; h++) {
+        const hh = String(h).padStart(2, '0');
+        timeSet.add(`${hh}:00`);
+        timeSet.add(`${hh}:30`);
+      }
+      timeSet.add('23:59');
+
+      items.forEach(it => {
+        if (it.hora && /^\d{1,2}:\d{2}$/.test(it.hora.trim())) {
+          const parts = it.hora.trim().split(':');
+          timeSet.add(`${parts[0].padStart(2, '0')}:${parts[1]}`);
+        }
+      });
+
+      const sortedTimes = Array.from(timeSet).sort();
+
+      if (tStart) {
+        const prevS = AppState.timeStartFilter || tStart.value || '';
+        tStart.innerHTML = `<option value="">00:00 (Inicio)</option>` +
+          sortedTimes.map(t => `<option value="${t}">${t} hs</option>`).join('');
+        tStart.value = prevS;
+      }
+
+      if (tEnd) {
+        const prevE = AppState.timeEndFilter || tEnd.value || '';
+        tEnd.innerHTML = `<option value="">23:59 (Final)</option>` +
+          sortedTimes.map(t => `<option value="${t}">${t} hs</option>`).join('');
+        tEnd.value = prevE;
+      }
+
+      if (rowList) {
+        const rowOpts = [];
+        const seenRows = new Set();
+        const addRowOpt = (num, label) => {
+          if (!num || seenRows.has(num)) return;
+          seenRows.add(num);
+          rowOpts.push(`<option value="${num}">${escapeHtml(label)}</option>`);
+        };
+
+        addRowOpt(1, 'Fila #1 (Inicio de hoja)');
+        let lastShiftKey = '';
+        items.forEach(it => {
+          const key = `${it.sheetName || ''} - ${it.fechaDia || ''} · ${it.turno || ''}`;
+          if (key !== lastShiftKey && it.excelRowNumber) {
+            lastShiftKey = key;
+            addRowOpt(it.excelRowNumber, `Fila #${it.excelRowNumber} (${key})`);
+          }
+        });
+
+        [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].forEach(n => {
+          addRowOpt(n, `Fila #${n}`);
+        });
+
+        if (items.length > 0) {
+          const lastIt = items[items.length - 1];
+          addRowOpt(lastIt.excelRowNumber, `Fila #${lastIt.excelRowNumber} (Última con datos)`);
+        }
+
+        rowList.innerHTML = rowOpts.join('');
+      }
+    }
+
+    function populateSheetSelector() {
+      populateTimeAndRowSelectors(AppState.excelItems || []);
+      if (!AppState.currentWorkbook) return;
+      const names = AppState.currentWorkbook.SheetNames || [];
+      if (names.length === 0) return;
+
+      const wrap = document.getElementById('sheetSelectorWrap');
+      if (wrap) wrap.style.display = 'none';
+
+      const sheetSelect = document.getElementById('sheetSelect');
+      const startSel = document.getElementById('sheetStartSelect');
+      const endSel = document.getElementById('sheetEndSelect');
+
+      if (sheetSelect) {
+        const prevVal = sheetSelect.value;
+        sheetSelect.innerHTML = '';
+        names.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          sheetSelect.appendChild(opt);
+        });
+        if (prevVal && names.includes(prevVal)) sheetSelect.value = prevVal;
+      }
+
+      if (startSel && endSel) {
+        const prevStart = AppState.sheetStartName || startSel.value;
+        const prevEnd = AppState.sheetEndName || endSel.value;
+
+        startSel.innerHTML = '';
+        endSel.innerHTML = '';
+        names.forEach((name, idx) => {
+          const sheetObj = AppState.currentWorkbook.Sheets[name];
+          const rowsArr = sheetObj ? XLSX.utils.sheet_to_json(sheetObj, { header: 1, defval: '', raw: false }) : [];
+          const rowCountLabel = rowsArr.length > 0 ? ` (${rowsArr.length} filas)` : '';
+
+          const o1 = document.createElement('option');
+          o1.value = name;
+          o1.textContent = `${idx + 1}. ${name}${rowCountLabel}`;
+          startSel.appendChild(o1);
+
+          const o2 = document.createElement('option');
+          o2.value = name;
+          o2.textContent = `${idx + 1}. ${name}${rowCountLabel}`;
+          endSel.appendChild(o2);
+        });
+
+        if (AppState.userSetSheetRange && prevStart && names.includes(prevStart) && prevEnd && names.includes(prevEnd)) {
+          startSel.value = prevStart;
+          endSel.value = prevEnd;
+        } else {
+          startSel.value = names[0];
+          endSel.value = names[names.length - 1];
+          AppState.sheetStartName = names[0];
+          AppState.sheetEndName = names[names.length - 1];
+        }
+      }
+
+      renderQuickSheetButtons();
+
+      const fileLabel = document.getElementById('fileNameLabel');
+      if (fileLabel) fileLabel.textContent = AppState.currentFileName;
+      const metaBar = document.getElementById('excelMetaBar');
+      if (metaBar) metaBar.style.display = 'flex';
+    }
+
+    function renderQuickSheetButtons() {
+      const wrap = document.getElementById('quickSheetButtons');
+      if (!wrap || !AppState.currentWorkbook) return;
+      const names = AppState.currentWorkbook.SheetNames || [];
+      if (names.length <= 1) {
+        wrap.innerHTML = `<span class="mini-pill">1 pestaña (${escapeHtml(names[0] || 'Hoja 1')})</span>`;
+        return;
+      }
+
+      const startSel = document.getElementById('sheetStartSelect');
+      const endSel = document.getElementById('sheetEndSelect');
+      const currStart = startSel ? startSel.value : names[0];
+      const currEnd = endSel ? endSel.value : names[names.length - 1];
+      const isAllSelected = (currStart === names[0] && currEnd === names[names.length - 1]);
+
+      const btns = [];
+      btns.push(`
+        <button
+          type="button"
+          class="tab-btn ${isAllSelected ? 'active' : ''}"
+          onclick="selectQuickSheetRange('${escapeHtml(names[0])}', '${escapeHtml(names[names.length - 1])}', true)"
+          style="padding: 3px 9px; font-size: 0.74rem;"
+          title="Leer y unir todas las pestañas de la planilla al mismo tiempo"
+        >
+          📚 Todas las Hojas (${names.length})
+        </button>
+      `);
+
+      names.forEach(n => {
+        const isSingle = (currStart === n && currEnd === n);
+        btns.push(`
+          <button
+            type="button"
+            class="tab-btn ${isSingle ? 'active' : ''}"
+            onclick="selectQuickSheetRange('${escapeHtml(n)}', '${escapeHtml(n)}', false)"
+            style="padding: 3px 9px; font-size: 0.74rem;"
+            title="Leer únicamente la pestaña ${escapeHtml(n)}"
+          >
+            📄 Solo ${escapeHtml(n)}
+          </button>
+        `);
+      });
+
+      wrap.innerHTML = btns.join('');
+    }
+
+    function selectQuickSheetRange(startName, endName, isAll) {
+      const startSel = document.getElementById('sheetStartSelect');
+      const endSel = document.getElementById('sheetEndSelect');
+      if (startSel) startSel.value = startName;
+      if (endSel) endSel.value = endName;
+      AppState.sheetStartName = startName;
+      AppState.sheetEndName = endName;
+      AppState.userSetSheetRange = true;
+      onRangeOrSheetChange();
+      showToast(isAll ? '📚 Usando todas las hojas unificadas' : `📄 Filtrado solo a: ${startName}`);
+    }
+
+    function resetSheetAndRowRange() {
+      if (!AppState.currentWorkbook) return;
+      const names = AppState.currentWorkbook.SheetNames || [];
+      const startSel = document.getElementById('sheetStartSelect');
+      const endSel = document.getElementById('sheetEndSelect');
+      const rStart = document.getElementById('rowStartInput');
+      const rEnd = document.getElementById('rowEndInput');
+      const tStart = document.getElementById('timeStartSelect');
+      const tEnd = document.getElementById('timeEndSelect');
+
+      if (startSel && names.length > 0) startSel.value = names[0];
+      if (endSel && names.length > 0) endSel.value = names[names.length - 1];
+      if (rStart) rStart.value = '';
+      if (rEnd) rEnd.value = '';
+      if (tStart) tStart.value = '';
+      if (tEnd) tEnd.value = '';
+
+      AppState.timeStartFilter = '';
+      AppState.timeEndFilter = '';
+      AppState.userSetSheetRange = false;
+      onRangeOrSheetChange();
+      showToast('🔄 Rango restablecido: leyendo todas las hojas, filas y horarios');
+    }
+
+    function onRangeOrSheetChange() {
+      AppState.userSetSheetRange = true;
+      onSheetChange();
+    }
+
+    function onSheetChange() {
+      if (!AppState.currentWorkbook) return;
+      const names = AppState.currentWorkbook.SheetNames || [];
+      if (names.length === 0) return;
+
+      const startSel = document.getElementById('sheetStartSelect');
+      const endSel = document.getElementById('sheetEndSelect');
+      const rStartEl = document.getElementById('rowStartInput');
+      const rEndEl = document.getElementById('rowEndInput');
+      const tStartEl = document.getElementById('timeStartSelect');
+      const tEndEl = document.getElementById('timeEndSelect');
+
+      const startName = (startSel && startSel.value) ? startSel.value : names[0];
+      const endName = (endSel && endSel.value) ? endSel.value : names[names.length - 1];
+
+      AppState.sheetStartName = startName;
+      AppState.sheetEndName = endName;
+      AppState.timeStartFilter = tStartEl ? tStartEl.value : '';
+      AppState.timeEndFilter = tEndEl ? tEndEl.value : '';
+
+      const rawStartRow = rStartEl && rStartEl.value ? parseInt(rStartEl.value, 10) : null;
+      const rawEndRow = rEndEl && rEndEl.value ? parseInt(rEndEl.value, 10) : null;
+
+      const minRowFilter = (rawStartRow && !isNaN(rawStartRow) && rawStartRow >= 1) ? rawStartRow : 1;
+      const maxRowFilter = (rawEndRow && !isNaN(rawEndRow) && rawEndRow >= 1) ? rawEndRow : Infinity;
+
+      AppState.rowStartFilter = minRowFilter > 1 ? minRowFilter : null;
+      AppState.rowEndFilter = maxRowFilter !== Infinity ? maxRowFilter : null;
+
+      renderQuickSheetButtons();
+
+      const idxA = Math.max(0, names.indexOf(startName));
+      const idxB = Math.max(0, names.indexOf(endName));
+      const minSheetIdx = Math.min(idxA, idxB);
+      const maxSheetIdx = Math.max(idxA, idxB);
+
+      const combinedParsed = [];
+      let carryDate = 'Sin fecha';
+      let carryShift = 'Turno Inicial';
+
+      for (let sIdx = 0; sIdx <= maxSheetIdx; sIdx++) {
+        const sName = names[sIdx];
+        const sheet = AppState.currentWorkbook.Sheets[sName];
+        if (!sheet) continue;
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+
+        const includeSheet = (sIdx >= minSheetIdx && sIdx <= maxSheetIdx);
+        const sheetMinRow = (sIdx === minSheetIdx) ? minRowFilter : 1;
+        const sheetMaxRow = (sIdx === maxSheetIdx) ? maxRowFilter : Infinity;
+
+        const res = extractItemsFromSheetRows(rows, {
+          sheetName: sName,
+          sheetIndex: sIdx,
+          initialDate: carryDate,
+          initialShift: carryShift,
+          includeInOutput: includeSheet,
+          minRowNum: sheetMinRow,
+          maxRowNum: sheetMaxRow
+        });
+
+        carryDate = res.lastDate;
+        carryShift = res.lastShift;
+        if (includeSheet && res.items.length > 0) {
+          combinedParsed.push(...res.items);
+        }
+      }
+
+      AppState.excelItems = combinedParsed;
+      populateTimeAndRowSelectors(combinedParsed);
+      const badge = document.getElementById('excelCountBadge');
+      if (badge) badge.textContent = `${combinedParsed.length} movimiento(s) válido(s)`;
+      const pill = document.getElementById('pillExcelCount');
+      if (pill) pill.textContent = combinedParsed.length;
+
+      runComparison();
+    }
+
+    function extractItemsFromSheetRows(rows, opts = {}) {
+      const sheetName = opts.sheetName || 'Hoja 1';
+      const sheetIndex = opts.sheetIndex || 0;
+      let currentDate = opts.initialDate || 'Sin fecha';
+      let currentShift = opts.initialShift || 'Turno Inicial';
+      const includeInOutput = opts.includeInOutput !== false;
+      const minRowNum = opts.minRowNum || 1;
+      const maxRowNum = opts.maxRowNum || Infinity;
+
+      if (!rows || rows.length === 0) {
+        return { items: [], lastDate: currentDate, lastShift: currentShift };
+      }
+
+      let colUsuario = 0, colCarga = 1, colRetiro = 2, colHora = 3, colBilletera = 4, colOk = 5, startRow = 0;
+
+      for (let r = 0; r < Math.min(5, rows.length); r++) {
+        const rowStr = rows[r].map(c => String(c).trim().toLowerCase());
+        const uIdx = rowStr.findIndex(c => c.includes('usuario') || c.includes('cliente') || c.includes('destino'));
+        const cIdx = rowStr.findIndex(c => c.includes('carga') || c.includes('deposito') || c.includes('depósito'));
+        if (uIdx !== -1 && cIdx !== -1) {
+          colUsuario = uIdx;
+          colCarga = cIdx;
+          const rIdx = rowStr.findIndex(c => c.includes('retiro'));
+          const hIdx = rowStr.findIndex(c => c.includes('hora') || c.includes('fecha'));
+          const bIdx = rowStr.findIndex(c => c.includes('billetera') || c.includes('banco'));
+          const oIdx = rowStr.findIndex(c => c === 'ok' || c.includes('verif') || c.includes('estado'));
+
+          if (rIdx !== -1) colRetiro = rIdx;
+          if (hIdx !== -1) colHora = hIdx;
+          if (bIdx !== -1) colBilletera = bIdx;
+          if (oIdx !== -1) colOk = oIdx;
+          startRow = r + 1;
+          break;
+        }
+      }
+
+      if (currentDate === 'Sin fecha') {
+        for (let r = startRow; r < Math.min(startRow + 25, rows.length); r++) {
+          const row = rows[r];
+          if (!row) continue;
+          for (let c = 0; c < 4; c++) {
+            const d = extractNormalizedDay(row[c]);
+            if (d) { currentDate = d; break; }
+          }
+          if (currentDate !== 'Sin fecha') break;
+        }
+      }
+
+      const parsed = [];
+
+      for (let r = startRow; r < rows.length; r++) {
+        const excelRowNumber = r + 1;
+        if (excelRowNumber > maxRowNum) break;
+
+        const row = rows[r];
+        if (!row || row.length === 0) continue;
+
+        const rawUser = String(row[colUsuario] ?? '').trim();
+        const rawCarga = row[colCarga];
+        const rawRetiro = row[colRetiro];
+        const rawHora = row[colHora];
+        const rawBilletera = String(row[colBilletera] ?? '').trim();
+        const rawOk = String(row[colOk] ?? '').trim();
+
+        if (!rawUser && !rawCarga && !rawRetiro) continue;
+
+        const carga = Math.abs(parseAmount(rawCarga));
+        const retiro = Math.abs(parseAmount(rawRetiro));
+
+        if (carga <= 0 && retiro <= 0) {
+          const cells = [rawUser, rawCarga, rawRetiro, rawHora].map(x => String(x ?? '').trim()).filter(Boolean);
+          for (const cellText of cells) {
+            const detectedDay = extractNormalizedDay(cellText);
+            if (detectedDay) { currentDate = detectedDay; break; }
+          }
+          const shiftLabel = cells.join(' · ');
+          if (shiftLabel) currentShift = shiftLabel;
+          continue;
+        }
+
+        if (!rawUser) continue;
+        if (!includeInOutput || excelRowNumber < minRowNum) continue;
+
+        const tipo = retiro > 0 && carga === 0 ? 'RETIRO' : 'DEPOSITO';
+        const monto = tipo === 'RETIRO' ? retiro : carga;
+
+        let timeCellVal = rawHora;
+        if ((!timeCellVal || String(timeCellVal).trim() === '') && tipo === 'DEPOSITO' && rawRetiro && String(rawRetiro).includes(':')) {
+          timeCellVal = rawRetiro;
+        }
+        const formattedTime = formatExcelTime(timeCellVal);
+
+        const uid = `E_${sheetName}_row_${excelRowNumber}_${normalizeUser(rawUser)}_${monto}`;
+        if (['ok', 'si', 'sí', '✓', '1', 'x'].includes(rawOk.toLowerCase())) {
+          if (AppState.manualChecks[uid] === undefined) {
+            AppState.manualChecks[uid] = true;
+          }
+        }
+
+        parsed.push({
+          uid,
+          sheetName,
+          sheetIndex,
+          excelRowNumber,
+          rowIndex0: r,
+          colOkIndex: colOk,
+          fechaDia: currentDate,
+          turno: currentShift,
+          usuarioOriginal: rawUser,
+          usuarioNorm: normalizeUser(rawUser),
+          carga,
+          retiro,
+          monto,
+          tipo,
+          hora: formattedTime,
+          billetera: rawBilletera,
+          okOriginal: rawOk
+        });
+      }
+
+      return { items: parsed, lastDate: currentDate, lastShift: currentShift };
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      populateTimeAndRowSelectors([]);
+      if (AppState.currentWorkbook) {
+        populateSheetSelector();
+        onSheetChange();
+      }
+    });
+  </script>
 </body>
 </html>

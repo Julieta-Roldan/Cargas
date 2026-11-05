@@ -667,9 +667,79 @@ create policy "Acceso publico total movimientos"
   <!-- TOAST -->
   <div id="toast" class="toast"></div>
 
-  <script src="js/state.js"></script>
-  <script src="js/supabase-config.js"></script>
+  <script src="js/state.js?v=20261105"></script>
+  <script src="js/supabase-config.js?v=20261105"></script>
   <script>
+    // Garantizar que las funciones actualizadas de Supabase (con papelera y orden descendente) estén siempre activas aunque GitHub tenga en caché js/supabase-config.js
+    async function fetchMovimientosFromDB(fechaDiaFilter = null, includeDeleted = false) {
+      const { url, key, isConfigured } = getSupabaseCredentials();
+      if (isConfigured) {
+        let endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.desc`;
+        if (!includeDeleted) {
+          endpoint += `&or=(borrado.is.null,borrado.eq.false)`;
+        }
+        if (fechaDiaFilter && fechaDiaFilter !== 'all') {
+          endpoint += `&fecha_dia=eq.${encodeURIComponent(fechaDiaFilter)}`;
+        }
+        const res = await fetch(endpoint, {
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Error Supabase (${res.status}): ${errText}`);
+        }
+        const data = await res.json();
+        return { source: 'supabase', data };
+      }
+      const raw = localStorage.getItem(LOCAL_STORAGE_MOVS_KEY);
+      let list = [];
+      try { list = raw ? JSON.parse(raw) : []; } catch (e) { list = []; }
+      if (!includeDeleted) list = list.filter(item => !item.borrado);
+      if (fechaDiaFilter && fechaDiaFilter !== 'all') list = list.filter(item => item.fecha_dia === fechaDiaFilter);
+      return { source: 'local', data: list };
+    }
+
+    async function updateMovimientoInDB(id, changes) {
+      const { url, key, isConfigured } = getSupabaseCredentials();
+      const dt = getCurrentDateAndTime();
+      const finalChanges = {
+        ...changes,
+        editado_hora: changes.editado_hora || `${dt.hora} (${dt.fechaDia})`
+      };
+      if (isConfigured) {
+        const endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}`;
+        const res = await fetch(endpoint, {
+          method: 'PATCH',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(finalChanges)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`No se pudo actualizar en Supabase: ${errText}`);
+        }
+        const updated = await res.json();
+        return { source: 'supabase', item: Array.isArray(updated) ? updated[0] : updated };
+      }
+      throw new Error('Supabase no configurado');
+    }
+
+    async function softDeleteMovimientoInDB(id) {
+      const dt = getCurrentDateAndTime();
+      return updateMovimientoInDB(id, {
+        borrado: true,
+        editado_hora: `Borrado a las ${dt.hora} (${dt.fechaDia})`
+      });
+    }
+
     let currentMovimientos = [];
     let clockInterval = null;
     let secretBuffer = ''; // Detección de la clave secreta +991
@@ -951,7 +1021,10 @@ create policy "Acceso publico total movimientos"
         return;
       }
 
-      listEl.innerHTML = currentMovimientos.map(m => {
+      // Ordenar siempre por ID descendente (el más nuevo arriba de todo sin importar cómo venga de la base)
+      const newestFirst = [...currentMovimientos].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+
+      listEl.innerHTML = newestFirst.map(m => {
         const isRetiro = m.tipo === 'RETIRO';
         const badgeClass = isRetiro ? 'mini-badge-retiro' : 'mini-badge-carga';
         const amountClass = isRetiro ? 'mini-amount-retiro' : 'mini-amount-carga';
