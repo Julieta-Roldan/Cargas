@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Registro — Cargas y Retiros</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: #0b1120;
+      color: #f8fafc;
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .worker-container {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 16px 14px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* BARRA SUPERIOR MINIMALISTA */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 10px 14px;
+    }
+    .shift-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+    .shift-box label {
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .shift-input {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      flex: 1;
+      min-width: 120px;
+    }
+    .shift-input:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
+
+    /* LOS 2 BOTONES LIMPIOS Y RESPONSIVE */
+    .big-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+    }
+    @media (max-width: 480px) {
+      .big-actions-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+    .giant-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 30px 16px;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease;
+      text-align: center;
+      user-select: none;
+      width: 100%;
+    }
+    @media (max-width: 480px) {
+      .giant-btn {
+        padding: 24px 14px;
+      }
+    }
+    .giant-btn:active {
+      transform: scale(0.97);
+    }
+    .giant-btn-carga {
+      background: #059669;
+      border-color: #10b981;
+      box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.4);
+    }
+    .giant-btn-carga:hover {
+      background: #047857;
+      box-shadow: 0 10px 28px -4px rgba(16, 185, 129, 0.55);
+    }
+    .giant-btn-retiro {
+      background: #c2410c;
+      border-color: #f97316;
+      box-shadow: 0 8px 24px -6px rgba(249, 115, 22, 0.4);
+    }
+    .giant-btn-retiro:hover {
+      background: #9a3412;
+      box-shadow: 0 10px 28px -4px rgba(249, 115, 22, 0.55);
+    }
+    .giant-title {
+      font-size: 1.45rem;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+    .giant-sub {
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+    .giant-kbd {
+      margin-top: 2px;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.25);
+      color: #cbd5e1;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* RESUMEN RÁPIDO */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stat-mini {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat-mini span {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .stat-mini strong {
+      font-size: 1.15rem;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* TABLA RESUMEN */
+    .recent-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .recent-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .recent-header strong {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+    }
+    .action-icon-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    .action-icon-btn:hover {
+      background: #334155;
+      color: #fff;
+    }
+
+    /* MODAL POPUP */
+    .quick-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 14px;
+    }
+    .quick-modal-backdrop.open {
+      display: flex;
+    }
+    .quick-modal {
+      background: #111827;
+      border: 2px solid #334155;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 440px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+      animation: popIn 0.12s ease-out;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .quick-modal.mode-carga {
+      border-color: #10b981;
+    }
+    .quick-modal.mode-retiro {
+      border-color: #f97316;
+    }
+    .qm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .qm-title {
+      font-size: 1.25rem;
+      font-weight: 900;
+      letter-spacing: 0.3px;
+    }
+    .qm-auto-time {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .qm-auto-time strong {
+      color: #38bdf8;
+      font-family: 'Consolas', monospace;
+      font-size: 0.95rem;
+    }
+    .qm-field {
+      margin-bottom: 14px;
+    }
+    .qm-field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .qm-input {
+      width: 100%;
+      background: #0b1120;
+      border: 1.5px solid #334155;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      box-sizing: border-box;
+    }
+    .qm-input:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+    .wallet-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .wallet-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      font-size: 0.74rem;
+      padding: 4px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .wallet-chip:hover {
+      border-color: #f97316;
+      color: #fff;
+    }
+    .qm-submit-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #ffffff;
+      cursor: pointer;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .qm-submit-carga {
+      background: #10b981;
+    }
+    .qm-submit-carga:hover {
+      background: #059669;
+    }
+    .qm-submit-retiro {
+      background: #f97316;
+    }
+    .qm-submit-retiro:hover {
+      background: #ea580c;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .modal-close:hover {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="worker-container">
+    <!-- BARRA SUPERIOR -->
+    <div class="top-bar">
+      <div class="shift-box">
+        <label for="workerShiftInput">Turno:</label>
+        <input
+          type="text"
+          id="workerShiftInput"
+          class="shift-input"
+          placeholder="Ej: TM · Erika y Pri"
+          onchange="saveWorkerShift()"
+        />
+        <button class="btn btn-outline" onclick="loadMovimientos()" style="padding: 7px 10px; font-size: 0.78rem;">
+          Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- LOS 2 BOTONES PRINCIPALES (SIN EMOJIS, 100% RESPONSIVE) -->
+    <div class="big-actions-grid">
+      <button type="button" class="giant-btn giant-btn-carga" onclick="openQuickModal('DEPOSITO')">
+        <span class="giant-title">NUEVA CARGA</span>
+        <span class="giant-sub">Usuario + Monto</span>
+        <span class="giant-kbd">Atajo: Tecla 1</span>
+      </button>
+
+      <button type="button" class="giant-btn giant-btn-retiro" onclick="openQuickModal('RETIRO')">
+        <span class="giant-title">NUEVO RETIRO</span>
+        <span class="giant-sub">Usuario + Monto + Billetera</span>
+        <span class="giant-kbd">Atajo: Tecla 2</span>
+      </button>
+    </div>
+
+    <!-- RESUMEN DEL DÍA -->
+    <div class="stats-strip">
+      <div class="stat-mini">
+        <span>Cargas Hoy</span>
+        <strong id="statTotalCargas" style="color: #34d399;">$ 0</strong>
+      </div>
+      <div class="stat-mini">
+        <span>Retiros Hoy</span>
+        <strong id="statTotalRetiros" style="color: #fb923c;">$ 0</strong>
+      </div>
+      <div class="stat-mini">
+        <span>Total Movs</span>
+        <strong id="statCountMovs" style="color: #38bdf8;">0</strong>
+      </div>
+    </div>
+
+    <!-- TABLA DE MOVIMIENTOS RECIENTES -->
+    <div class="recent-card">
+      <div class="recent-header">
+        <strong>Movimientos Registrados</strong>
+        <span id="dbStatusBadge" style="font-size: 0.75rem; color: #94a3b8;">
+          Conectando...
+        </span>
+      </div>
+
+      <div style="overflow-x: auto; max-height: 400px;">
+        <table style="width: 100%; border-collapse: collapse; min-width: 520px;">
+          <thead>
+            <tr style="background: #0f172a; border-bottom: 1px solid #1e293b;">
+              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">HORA</th>
+              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">TIPO</th>
+              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">USUARIO</th>
+              <th style="padding: 9px 12px; text-align: right; font-size: 0.74rem; color: #94a3b8;">MONTO</th>
+              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">BILLETERA</th>
+              <th style="padding: 9px 12px; text-align: center; font-size: 0.74rem; color: #94a3b8;">ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody id="movimientosTbody">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 24px; color: #64748b; font-size: 0.85rem;">
+                No hay movimientos registrados. Tocá NUEVA CARGA o NUEVO RETIRO.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL RÁPIDO: CARGA O RETIRO                              -->
+  <!-- ========================================================= -->
+  <div class="quick-modal-backdrop" id="quickModalBackdrop" onclick="handleBackdropClick(event, 'quickModalBackdrop')">
+    <div class="quick-modal mode-carga" id="quickModalBox">
+      <div class="qm-header">
+        <div class="qm-title" id="qmTitle">NUEVA CARGA</div>
+        <button class="modal-close" onclick="closeQuickModal()" type="button">✕</button>
+      </div>
+
+      <!-- Horario automático informativo -->
+      <div class="qm-auto-time">
+        <span>Horario automático:</span>
+        <strong id="qmAutoClock">--:-- · --/--</strong>
+      </div>
+
+      <form id="quickForm" onsubmit="submitQuickForm(event)" autocomplete="off">
+        <input type="hidden" id="qmEditId" value="" />
+        <input type="hidden" id="qmTipo" value="DEPOSITO" />
+
+        <!-- CAMPO 1: USUARIO -->
+        <div class="qm-field">
+          <label for="qmUsuario">1. Nombre de Usuario</label>
+          <input
+            type="text"
+            id="qmUsuario"
+            class="qm-input"
+            list="knownUsersList"
+            placeholder="Ej: selenanvxx"
+            required
+          />
+          <datalist id="knownUsersList"></datalist>
+        </div>
+
+        <!-- CAMPO 2: MONTO -->
+        <div class="qm-field">
+          <label for="qmMonto">2. Monto ($)</label>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="qmMonto"
+            class="qm-input"
+            placeholder="Ej: 5000 o 30.000"
+            required
+          />
+        </div>
+
+        <!-- CAMPO 3: BILLETERA (SOLO EN RETIRO) -->
+        <div class="qm-field" id="qmBilleteraWrap" style="display: none;">
+          <label for="qmBilletera">3. ¿De qué billetera se pagó?</label>
+          <input
+            type="text"
+            id="qmBilletera"
+            class="qm-input"
+            placeholder="Ej: Mp morena / Brubank / Uala"
+          />
+          <div class="wallet-chips" id="walletChipsContainer"></div>
+        </div>
+
+        <button type="submit" class="qm-submit-btn qm-submit-carga" id="qmSubmitBtn">
+          Guardar Carga (Enter)
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL SECRETO DE CONFIGURACIÓN DE SUPABASE (CLAVE: +991)  -->
+  <!-- ========================================================= -->
+  <div class="quick-modal-backdrop" id="supabaseModalBackdrop" onclick="handleBackdropClick(event, 'supabaseModalBackdrop')">
+    <div class="quick-modal" style="max-width: 580px; border-color: #38bdf8;">
+      <div class="qm-header">
+        <div class="qm-title" style="color: #38bdf8;">Configuración de Base de Datos (Supabase)</div>
+        <button class="modal-close" onclick="closeSupabaseModal()" type="button">✕</button>
+      </div>
+
+      <p style="font-size: 0.83rem; color: #cbd5e1; margin-top: 0; line-height: 1.5;">
+        Conectá tu proyecto de Supabase para guardar en la nube en tiempo real.
+      </p>
+
+      <div class="qm-field">
+        <label for="sbUrlInput">Supabase Project URL</label>
+        <input type="text" id="sbUrlInput" class="qm-input" style="font-size: 0.88rem; font-family: monospace;" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+      </div>
+
+      <div class="qm-field">
+        <label for="sbKeyInput">Supabase Anon Public Key</label>
+        <input type="text" id="sbKeyInput" class="qm-input" style="font-size: 0.82rem; font-family: monospace;" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+      </div>
+
+      <details style="background: #0b1120; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
+        <summary style="cursor: pointer; font-weight: 700; font-size: 0.82rem; color: #38bdf8;">
+          Código SQL para crear la tabla en Supabase (1 clic)
+        </summary>
+        <p style="font-size: 0.75rem; color: #94a3b8; margin: 8px 0;">
+          En Supabase andá a <strong>SQL Editor → New Query</strong>, pegá esto y dale a <strong>Run</strong>:
+        </p>
+        <pre id="sqlSnippet" style="background: #020617; color: #a7f3d0; padding: 8px; border-radius: 6px; font-size: 0.72rem; overflow-x: auto; margin: 0;">create table if not exists public.movimientos (
+  id bigint generated by default as identity primary key,
+  tipo text not null default 'DEPOSITO',
+  usuario text not null,
+  monto numeric not null default 0,
+  billetera text default '',
+  hora text not null,
+  fecha_dia text not null,
+  turno text default '',
+  verificado boolean default false,
+  created_at timestamptz default now()
+);
+
+alter table public.movimientos enable row level security;
+
+create policy "Acceso publico total movimientos"
+  on public.movimientos for all
+  using (true)
+  with check (true);</pre>
+        <button type="button" class="btn btn-outline" onclick="copySqlSnippet()" style="margin-top: 8px; padding: 5px 10px; font-size: 0.74rem;">
+          Copiar SQL
+        </button>
+      </details>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeSupabaseModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="saveSupabaseConfigFromModal()">Guardar y Conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast"></div>
+
+  <script src="js/state.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script>
+    let currentMovimientos = [];
+    let clockInterval = null;
+    let secretBuffer = ''; // Detección de la clave secreta +991
+
+    const DEFAULT_WALLETS = ['Mp morena', 'Mp', 'Brubank', 'Uala', 'Naranja X'];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedShift = localStorage.getItem('worker_active_shift_v1') || 'Turno Actual';
+      document.getElementById('workerShiftInput').value = savedShift;
+
+      renderWalletChips();
+      loadMovimientos();
+
+      // Detección de teclado general y combinación secreta +991
+      document.addEventListener('keydown', (e) => {
+        const isModalOpen = document.getElementById('quickModalBackdrop').classList.contains('open') ||
+                            document.getElementById('supabaseModalBackdrop').classList.contains('open');
+
+        if (isModalOpen) {
+          if (e.key === 'Escape') {
+            closeQuickModal();
+            closeSupabaseModal();
+          }
+          return;
+        }
+
+        // Si el foco está en un input normal, no interceptar como atajo
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+          return;
+        }
+
+        // Detección de la palabra clave secreta: +991
+        if (e.key && e.key.length === 1) {
+          secretBuffer = (secretBuffer + e.key.toLowerCase()).slice(-4);
+          if (secretBuffer === '+991') {
+            secretBuffer = '';
+            openSupabaseModal();
+            return;
+          }
+        }
+
+        if (e.key === '1') {
+          e.preventDefault();
+          openQuickModal('DEPOSITO');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          openQuickModal('RETIRO');
+        }
+      });
+    });
+
+    function saveWorkerShift() {
+      const val = document.getElementById('workerShiftInput').value.trim() || 'Turno Actual';
+      localStorage.setItem('worker_active_shift_v1', val);
+      showToast(`Turno guardado: ${val}`);
+    }
+
+    function renderWalletChips() {
+      const savedWallets = JSON.parse(localStorage.getItem('worker_recent_wallets_v1') || '[]');
+      const allWallets = [...new Set([...savedWallets, ...DEFAULT_WALLETS])].slice(0, 6);
+      const container = document.getElementById('walletChipsContainer');
+      container.innerHTML = allWallets.map(w =>
+        `<span class="wallet-chip" onclick="selectWalletChip('${escapeHtml(w)}')">${escapeHtml(w)}</span>`
+      ).join('');
+    }
+
+    function selectWalletChip(walletName) {
+      const input = document.getElementById('qmBilletera');
+      input.value = walletName;
+      input.focus();
+    }
+
+    function rememberWallet(walletName) {
+      if (!walletName) return;
+      const saved = JSON.parse(localStorage.getItem('worker_recent_wallets_v1') || '[]');
+      const updated = [walletName, ...saved.filter(w => w.toLowerCase() !== walletName.toLowerCase())].slice(0, 8);
+      localStorage.setItem('worker_recent_wallets_v1', JSON.stringify(updated));
+      renderWalletChips();
+    }
+
+    function updateAutoClockDisplay() {
+      const dt = getCurrentDateAndTime();
+      document.getElementById('qmAutoClock').textContent = `${dt.hora} hs · Fecha ${dt.fechaDia}`;
+    }
+
+    function openQuickModal(tipo, editItem = null) {
+      const backdrop = document.getElementById('quickModalBackdrop');
+      const box = document.getElementById('quickModalBox');
+      const titleEl = document.getElementById('qmTitle');
+      const billeteraWrap = document.getElementById('qmBilleteraWrap');
+      const billeteraInput = document.getElementById('qmBilletera');
+      const submitBtn = document.getElementById('qmSubmitBtn');
+
+      document.getElementById('qmTipo').value = tipo;
+      document.getElementById('qmEditId').value = editItem ? editItem.id : '';
+
+      if (tipo === 'RETIRO') {
+        box.className = 'quick-modal mode-retiro';
+        titleEl.textContent = editItem ? 'EDITAR RETIRO' : 'NUEVO RETIRO';
+        billeteraWrap.style.display = 'block';
+        billeteraInput.required = true;
+        submitBtn.className = 'qm-submit-btn qm-submit-retiro';
+        submitBtn.textContent = editItem ? 'GUARDAR CAMBIOS (ENTER)' : 'REGISTRAR RETIRO (ENTER)';
+      } else {
+        box.className = 'quick-modal mode-carga';
+        titleEl.textContent = editItem ? 'EDITAR CARGA' : 'NUEVA CARGA';
+        billeteraWrap.style.display = 'none';
+        billeteraInput.required = false;
+        submitBtn.className = 'qm-submit-btn qm-submit-carga';
+        submitBtn.textContent = editItem ? 'GUARDAR CAMBIOS (ENTER)' : 'GUARDAR CARGA (ENTER)';
+      }
+
+      document.getElementById('qmUsuario').value = editItem ? editItem.usuario : '';
+      document.getElementById('qmMonto').value = editItem ? editItem.monto : '';
+      billeteraInput.value = editItem ? (editItem.billetera || '') : '';
+
+      if (editItem) {
+        document.getElementById('qmAutoClock').textContent = `${editItem.hora} hs · Fecha ${editItem.fecha_dia}`;
+      } else {
+        updateAutoClockDisplay();
+        clearInterval(clockInterval);
+        clockInterval = setInterval(updateAutoClockDisplay, 5000);
+      }
+
+      backdrop.classList.add('open');
+      setTimeout(() => {
+        document.getElementById('qmUsuario').focus();
+      }, 40);
+    }
+
+    function closeQuickModal() {
+      document.getElementById('quickModalBackdrop').classList.remove('open');
+      clearInterval(clockInterval);
+    }
+
+    async function submitQuickForm(e) {
+      e.preventDefault();
+      const editId = document.getElementById('qmEditId').value;
+      const tipo = document.getElementById('qmTipo').value;
+      const usuario = document.getElementById('qmUsuario').value.trim();
+      const rawMonto = document.getElementById('qmMonto').value.trim();
+      const monto = parseAmount(rawMonto);
+      const billetera = tipo === 'RETIRO' ? document.getElementById('qmBilletera').value.trim() : '';
+      const turno = document.getElementById('workerShiftInput').value.trim() || 'Turno Actual';
+
+      if (!usuario) {
+        showToast('Escribí el nombre de usuario');
+        document.getElementById('qmUsuario').focus();
+        return;
+      }
+      if (!monto || monto <= 0) {
+        showToast('Ingresá un monto válido');
+        document.getElementById('qmMonto').focus();
+        return;
+      }
+      if (tipo === 'RETIRO' && !billetera) {
+        showToast('Indicá la billetera del pago');
+        document.getElementById('qmBilletera').focus();
+        return;
+      }
+
+      const btn = document.getElementById('qmSubmitBtn');
+      const prevText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        if (tipo === 'RETIRO') rememberWallet(billetera);
+
+        if (editId) {
+          await updateMovimientoInDB(editId, {
+            tipo,
+            usuario,
+            monto,
+            billetera,
+            turno
+          });
+          showToast(`Movimiento de ${usuario} actualizado`);
+        } else {
+          await insertMovimientoInDB({
+            tipo,
+            usuario,
+            monto,
+            billetera,
+            turno
+          });
+          showToast(`${tipo === 'RETIRO' ? 'Retiro' : 'Carga'} de ${usuario} ($ ${monto.toLocaleString('es-AR')}) guardada`);
+        }
+
+        closeQuickModal();
+        await loadMovimientos();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevText;
+      }
+    }
+
+    async function loadMovimientos() {
+      const badge = document.getElementById('dbStatusBadge');
+      const dt = getCurrentDateAndTime();
+
+      try {
+        const res = await fetchMovimientosFromDB(dt.fechaDia);
+        currentMovimientos = res.data || [];
+
+        if (res.source === 'supabase') {
+          badge.innerHTML = `<span style="color:#34d399;">Conectado a la nube</span>`;
+        } else {
+          badge.innerHTML = `<span style="color:#fbbf24;">Memoria local activa</span>`;
+        }
+
+        updateKnownUsersDatalist();
+        renderMovimientosTable();
+      } catch (err) {
+        badge.innerHTML = `<span style="color:#f87171;">Sin conexión</span>`;
+      }
+    }
+
+    function updateKnownUsersDatalist() {
+      const users = [...new Set(currentMovimientos.map(m => m.usuario).filter(Boolean))];
+      const dl = document.getElementById('knownUsersList');
+      dl.innerHTML = users.map(u => `<option value="${escapeHtml(u)}"></option>`).join('');
+    }
+
+    function renderMovimientosTable() {
+      const tbody = document.getElementById('movimientosTbody');
+      const sorted = [...currentMovimientos].sort((a, b) => (b.id || 0) - (a.id || 0));
+
+      let totalCargas = 0;
+      let totalRetiros = 0;
+      currentMovimientos.forEach(m => {
+        if (m.tipo === 'RETIRO') totalRetiros += Number(m.monto) || 0;
+        else totalCargas += Number(m.monto) || 0;
+      });
+
+      document.getElementById('statTotalCargas').textContent = '$ ' + totalCargas.toLocaleString('es-AR');
+      document.getElementById('statTotalRetiros').textContent = '$ ' + totalRetiros.toLocaleString('es-AR');
+      document.getElementById('statCountMovs').textContent = String(currentMovimientos.length);
+
+      if (sorted.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 24px; color: #64748b; font-size: 0.85rem;">
+              No hay movimientos registrados hoy.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = sorted.map(m => {
+        const isRetiro = m.tipo === 'RETIRO';
+        const badgeStyle = isRetiro
+          ? 'background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);'
+          : 'background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
+        const amountColor = isRetiro ? '#fb923c' : '#34d399';
+
+        return `
+          <tr style="border-bottom: 1px solid #1e293b;">
+            <td style="padding: 10px 12px; font-family: 'Consolas', monospace; font-size: 0.88rem;">
+              <strong>${escapeHtml(m.hora || '--:--')}</strong>
+            </td>
+            <td style="padding: 10px 12px;">
+              <span style="padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 800; ${badgeStyle}">
+                ${isRetiro ? 'RETIRO' : 'CARGA'}
+              </span>
+            </td>
+            <td style="padding: 10px 12px; font-size: 0.96rem; font-weight: 800; color: #ffffff;">
+              ${escapeHtml(m.usuario)}
+            </td>
+            <td style="padding: 10px 12px; text-align: right; font-family: 'Consolas', monospace; font-size: 1rem; font-weight: 800; color: ${amountColor};">
+              $ ${Number(m.monto || 0).toLocaleString('es-AR')}
+            </td>
+            <td style="padding: 10px 12px; font-size: 0.84rem; color: ${isRetiro ? '#fdba74' : '#475569'};">
+              ${isRetiro ? escapeHtml(m.billetera || '-') : '—'}
+            </td>
+            <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
+              <button class="action-icon-btn" onclick="editMovimiento('${escapeHtml(m.id)}')">Editar</button>
+              <button class="action-icon-btn" onclick="removeMovimiento('${escapeHtml(m.id)}')">Borrar</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function editMovimiento(id) {
+      const item = currentMovimientos.find(x => String(x.id) === String(id));
+      if (!item) return;
+      openQuickModal(item.tipo, item);
+    }
+
+    async function removeMovimiento(id) {
+      const item = currentMovimientos.find(x => String(x.id) === String(id));
+      if (!item) return;
+      if (!confirm(`¿Eliminar movimiento de "${item.usuario}" por $ ${Number(item.monto).toLocaleString('es-AR')}?`)) {
+        return;
+      }
+      try {
+        await deleteMovimientoFromDB(id);
+        showToast('Movimiento eliminado');
+        await loadMovimientos();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Modal secreto (clave cvr11)
+    function openSupabaseModal() {
+      const creds = getSupabaseCredentials();
+      document.getElementById('sbUrlInput').value = creds.url;
+      document.getElementById('sbKeyInput').value = creds.key;
+      document.getElementById('supabaseModalBackdrop').classList.add('open');
+    }
+
+    function closeSupabaseModal() {
+      document.getElementById('supabaseModalBackdrop').classList.remove('open');
+    }
+
+    async function saveSupabaseConfigFromModal() {
+      const url = document.getElementById('sbUrlInput').value.trim();
+      const key = document.getElementById('sbKeyInput').value.trim();
+      saveSupabaseCredentials(url, key);
+      closeSupabaseModal();
+      await loadMovimientos();
+      showToast('Supabase conectado correctamente');
+    }
+
+    function copySqlSnippet() {
+      const sql = document.getElementById('sqlSnippet').textContent;
+      navigator.clipboard.writeText(sql);
+      showToast('Código SQL copiado');
+    }
+
+    function handleBackdropClick(e, id) {
+      if (e.target.id === id) {
+        document.getElementById(id).classList.remove('open');
+        clearInterval(clockInterval);
+      }
+    }
+  </script>
+</body>
+</html>

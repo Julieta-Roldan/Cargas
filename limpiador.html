@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Limpiador Rápido de Texto del Panel</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    .cleaner-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 960px) {
+      .cleaner-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .clean-output-box {
+      width: 100%;
+      min-height: 240px;
+      background: #060b16;
+      color: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.92rem;
+      line-height: 1.65;
+      resize: vertical;
+    }
+    .format-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .format-pill {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-input);
+      color: #cbd5e1;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .format-pill:hover {
+      border-color: #60a5fa;
+      color: #ffffff;
+    }
+    .format-pill.active {
+      background: rgba(59, 130, 246, 0.24);
+      border-color: #3b82f6;
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ENCABEZADO -->
+    <header class="app-header">
+      <div class="brand-box">
+        <div class="brand-icon">🧹</div>
+        <div>
+          <h1>Limpiador Rápido de Movimientos del Panel</h1>
+          <p>Pega el texto crudo del Panel y obtén al instante: Horario, Fecha, Usuario, Monto y si es Carga/Depósito o Retiro</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a href="index.html" class="btn btn-primary" style="text-decoration: none;">⬅️ Volver al Comparador Principal</a>
+        <button class="btn btn-success" onclick="copyCleanOutput()">📋 Copiar Texto en Limpio</button>
+        <button class="btn btn-outline" onclick="loadSampleCleaner()">🧪 Cargar Ejemplo</button>
+        <button class="btn btn-outline" onclick="clearCleaner()">🗑️ Limpiar</button>
+      </div>
+    </header>
+
+    <!-- RESUMEN RÁPIDO -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 16px;">
+      <div class="stat-card all active" onclick="setTypeFilterCleaner('all')" id="cleanCardAll">
+        <div class="stat-label">Total Movimientos</div>
+        <div class="stat-value" id="cleanCountAll">0</div>
+        <div class="stat-sub">Clic para ver todos</div>
+      </div>
+      <div class="stat-card matched" onclick="setTypeFilterCleaner('DEPOSITO')" id="cleanCardDep">
+        <div class="stat-label">📥 Cargas / Depósitos</div>
+        <div class="stat-value" id="cleanCountDep">0</div>
+        <div class="stat-sub" id="cleanSumDep">$ 0</div>
+      </div>
+      <div class="stat-card diff" onclick="setTypeFilterCleaner('RETIRO')" id="cleanCardRet">
+        <div class="stat-label">📤 Retiros</div>
+        <div class="stat-value" id="cleanCountRet">0</div>
+        <div class="stat-sub" id="cleanSumRet">$ 0</div>
+      </div>
+    </div>
+
+    <!-- ENTRADA Y SALIDA EN LIMPIO LADO A LADO -->
+    <div class="cleaner-grid">
+      <!-- ENTRADA CRUDA -->
+      <div class="subcard">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="badge-step">1</span>
+            Pegar texto crudo del Panel Administrativo
+          </div>
+          <span id="rawLinesBadge" style="font-size: 0.8rem; color: var(--text-muted);">0 detectados</span>
+        </div>
+        <textarea
+          id="rawPanelCleanerInput"
+          style="min-height: 280px;"
+          oninput="processCleaner()"
+          placeholder="Pega aquí las líneas del panel (no importa si tienen renglones vacíos entre medio)...&#10;&#10;43cv	3/11/2026 1:07	DEPOSITO (Solicitado por 29722092)	naycelu543	rossaferreyra	2000 	0 	2000&#10;uszs	3/11/2026 21:10	RETIRO (Solicitado por 29722092)	clauxxdia3	naycelu543	0 	-33.000 	-33.000"
+        ></textarea>
+      </div>
+
+      <!-- SALIDA DE TEXTO EN LIMPIO -->
+      <div class="subcard">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="badge-step">2</span>
+            Texto en Limpio (Listo para copiar)
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="cleanOrderSelect" onchange="processCleaner()" style="padding: 4px 8px; font-size: 0.78rem;">
+              <option value="original">Orden original pegado</option>
+              <option value="time_asc">Ordenar por Horario (00:00 → 23:59)</option>
+              <option value="time_desc">Ordenar por Horario (Más reciente primero)</option>
+            </select>
+            <button class="btn btn-success" style="padding: 5px 12px; font-size: 0.8rem;" onclick="copyCleanOutput()">
+              📋 Copiar
+            </button>
+          </div>
+        </div>
+
+        <div class="format-pills">
+          <button class="format-pill active" id="fmtBtnSimple" onclick="setCleanFormat('simple')">
+            📄 Simple (Horario · Fecha · Usuario · Monto · Tipo)
+          </button>
+          <button class="format-pill" id="fmtBtnWhatsapp" onclick="setCleanFormat('whatsapp')">
+            💬 Para WhatsApp
+          </button>
+          <button class="format-pill" id="fmtBtnTabs" onclick="setCleanFormat('tabs')">
+            📊 Columnas para Excel / Sheets
+          </button>
+        </div>
+
+        <textarea
+          id="cleanTextOutput"
+          class="clean-output-box"
+          readonly
+          placeholder="Aquí aparecerá el texto limpio automáticamente apenas pegues los datos..."
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- TABLA VISUAL EN LIMPIO -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 60px; text-align: center;">#</th>
+            <th style="width: 100px;">Horario</th>
+            <th style="width: 120px;">Fecha</th>
+            <th>Usuario</th>
+            <th style="text-align: right; width: 160px;">Monto</th>
+            <th style="width: 180px;">Tipo (Carga / Retiro)</th>
+            <th style="width: 110px;">ID Panel</th>
+          </tr>
+        </thead>
+        <tbody id="cleanTableBody">
+          <tr>
+            <td colspan="7" class="empty-state">
+              Pega los movimientos en el cuadro de arriba para verlos pasados en limpio.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/state.js"></script>
+  <script>
+    let currentCleanFormat = 'simple';
+    let currentCleanTypeFilter = 'all';
+
+    function setCleanFormat(fmt) {
+      currentCleanFormat = fmt;
+      document.getElementById('fmtBtnSimple').classList.toggle('active', fmt === 'simple');
+      document.getElementById('fmtBtnWhatsapp').classList.toggle('active', fmt === 'whatsapp');
+      document.getElementById('fmtBtnTabs').classList.toggle('active', fmt === 'tabs');
+      processCleaner();
+    }
+
+    function setTypeFilterCleaner(type) {
+      currentCleanTypeFilter = type;
+      document.getElementById('cleanCardAll').classList.toggle('active', type === 'all');
+      document.getElementById('cleanCardDep').classList.toggle('active', type === 'DEPOSITO');
+      document.getElementById('cleanCardRet').classList.toggle('active', type === 'RETIRO');
+      processCleaner();
+    }
+
+    function parseRawCleanerLines(raw) {
+      const normalizedRaw = String(raw || '').replace(/(\S)\s+([a-z0-9]{4}\t\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})/gi, '$1\n$2');
+      const rawLines = normalizedRaw.split(/\r?\n/);
+
+      const mergedLines = [];
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i].trim();
+        if (!line) continue;
+        if (/^Nro\s+Fecha/i.test(line) || /^TOTALES/i.test(line)) continue;
+
+        const startsNewRecord = /^[a-z0-9]{3,10}\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i.test(line);
+        if (startsNewRecord || mergedLines.length === 0) {
+          mergedLines.push(line);
+        } else {
+          mergedLines[mergedLines.length - 1] += ' ' + line;
+        }
+      }
+
+      const items = [];
+      mergedLines.forEach((line, idx) => {
+        const parts = line.split('\t').map(s => s.trim()).filter(Boolean);
+        let id, fechaCompleta, operacionRaw, agente, destino, dep = 0, ret = 0;
+        let parsedOk = false;
+
+        if (parts.length >= 6) {
+          id = parts[0];
+          fechaCompleta = parts[1];
+          operacionRaw = parts[2];
+          agente = parts[3];
+          destino = parts[4];
+          dep = Math.abs(parseAmount(parts[5]));
+          ret = Math.abs(parseAmount(parts[6]));
+          parsedOk = (dep > 0 || ret > 0);
+        } else {
+          const regex = /^(\S+)\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+(.+?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)(?:\s+([-\d.,]+))?$/;
+          const match = line.match(regex);
+          if (match) {
+            [, id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr] = match;
+            dep = Math.abs(parseAmount(depStr));
+            ret = Math.abs(parseAmount(retStr));
+            parsedOk = (dep > 0 || ret > 0);
+          }
+        }
+
+        if (parsedOk) {
+          const isRetiroOp = /RETIRO/i.test(operacionRaw) || (ret > 0 && dep === 0);
+          const tipo = isRetiroOp ? 'RETIRO' : 'DEPOSITO';
+          const tipoLabel = isRetiroOp ? 'Retiro' : 'Carga (Depósito)';
+          const monto = isRetiroOp ? ret : dep;
+
+          let usuario = destino;
+          if (isRetiroOp && normalizeUser(destino) === 'naycelu543') {
+            usuario = agente;
+          }
+
+          const dt = parsePanelDateTime(fechaCompleta);
+          const fechaSolo = fechaCompleta.split(/\s+/)[0] || fechaCompleta;
+
+          items.push({
+            idxOriginal: idx + 1,
+            id,
+            horario: dt.timeStr || fechaCompleta.split(/\s+/)[1] || '',
+            fecha: fechaSolo,
+            usuario,
+            monto,
+            tipo,
+            tipoLabel,
+            timestamp: dt.timestamp,
+            minutesOfDay: dt.minutesOfDay
+          });
+        }
+      });
+
+      return items;
+    }
+
+    function processCleaner() {
+      const raw = document.getElementById('rawPanelCleanerInput').value;
+      const allItems = parseRawCleanerLines(raw);
+
+      const depItems = allItems.filter(i => i.tipo === 'DEPOSITO');
+      const retItems = allItems.filter(i => i.tipo === 'RETIRO');
+
+      document.getElementById('rawLinesBadge').textContent = `${allItems.length} movimiento(s)`;
+      document.getElementById('cleanCountAll').textContent = allItems.length;
+      document.getElementById('cleanCountDep').textContent = depItems.length;
+      document.getElementById('cleanCountRet').textContent = retItems.length;
+
+      const sumDep = depItems.reduce((a, b) => a + b.monto, 0);
+      const sumRet = retItems.reduce((a, b) => a + b.monto, 0);
+      document.getElementById('cleanSumDep').textContent = formatMoney(sumDep);
+      document.getElementById('cleanSumRet').textContent = formatMoney(sumRet);
+
+      let filtered = allItems.filter(i => currentCleanTypeFilter === 'all' || i.tipo === currentCleanTypeFilter);
+      const order = document.getElementById('cleanOrderSelect').value;
+
+      if (order === 'time_asc') {
+        filtered.sort((a, b) => a.timestamp - b.timestamp || a.minutesOfDay - b.minutesOfDay);
+      } else if (order === 'time_desc') {
+        filtered.sort((a, b) => b.timestamp - a.timestamp || b.minutesOfDay - a.minutesOfDay);
+      }
+
+      // Generar texto en limpio
+      const textLines = filtered.map(item => {
+        if (currentCleanFormat === 'whatsapp') {
+          return `• *${item.horario}* (${item.fecha}) | *${item.usuario}* | *${formatMoney(item.monto)}* | ${item.tipoLabel}`;
+        }
+        if (currentCleanFormat === 'tabs') {
+          return `${item.horario}\t${item.fecha}\t${item.usuario}\t${item.monto}\t${item.tipoLabel}`;
+        }
+        return `${item.horario}  |  ${item.fecha}  |  ${item.usuario}  |  ${formatMoney(item.monto)}  |  ${item.tipoLabel}`;
+      });
+
+      document.getElementById('cleanTextOutput').value = textLines.join('\n');
+
+      // Renderizar tabla en limpio
+      const tbody = document.getElementById('cleanTableBody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="empty-state">
+              Pega los movimientos del Panel arriba para verlos en limpio.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((item, idx) => {
+        const badge = item.tipo === 'RETIRO'
+          ? '<span class="type-badge type-retiro">Retiro</span>'
+          : '<span class="type-badge type-deposito">Carga / Depósito</span>';
+        return `
+          <tr class="${item.tipo === 'RETIRO' ? 'row-diff' : 'row-matched'}">
+            <td class="mono" style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
+            <td class="mono" style="font-size: 1rem; font-weight: 800; color: #93c5fd;">${escapeHtml(item.horario)}</td>
+            <td class="mono" style="font-size: 0.92rem; color: #cbd5e1;">${escapeHtml(item.fecha)}</td>
+            <td class="cell-user"><span class="user-highlight">${escapeHtml(item.usuario)}</span></td>
+            <td class="amount amount-highlight">${formatMoney(item.monto)}</td>
+            <td>${badge}</td>
+            <td class="mono" style="color: var(--text-muted); font-size: 0.82rem;">${escapeHtml(item.id)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function copyCleanOutput() {
+      const txt = document.getElementById('cleanTextOutput').value;
+      if (!txt.trim()) {
+        showToast('⚠️ No hay texto limpio para copiar');
+        return;
+      }
+      navigator.clipboard.writeText(txt).then(() => {
+        showToast('📋 ¡Texto en limpio copiado al portapapeles!');
+      });
+    }
+
+    function clearCleaner() {
+      document.getElementById('rawPanelCleanerInput').value = '';
+      processCleaner();
+      showToast('🗑️ Limpiador vacío');
+    }
+
+    function loadSampleCleaner() {
+      document.getElementById('rawPanelCleanerInput').value = [
+        '43cv\t3/11/2026 1:07\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\trossaferreyra\t2000 \t0 \t2000',
+        '',
+        'hwe3\t3/11/2026 4:34\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tmariarojasx\t5000 \t0 \t5000',
+        '',
+        'uuua\t3/11/2026 2:49\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\truthb9\t3000 \t0 \t3000 ',
+        '',
+        '5f6k\t3/11/2026 6:29\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tbenitezmarina99\t2500 \t0 \t2500',
+        ' \t',
+        'k9au\t3/11/2026 10:17\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tari.ill\t1000 \t0 \t1000 \t',
+        '',
+        '8tcu\t3/11/2026 14:29\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\talfredooxx\t5000 \t0 \t5000 ',
+        '\t',
+        'afsh\t3/11/2026 16:31\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tadrianacb3\t3000 \t0 \t3000 ',
+        '',
+        '6os2\t3/11/2026 19:05\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tromaidn1\t22.000 \t0 \t22.000 ',
+        '',
+        'xxwx\t3/11/2026 19:06\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tcarmenalbano77\t5750 \t0 \t5750 ',
+        '',
+        '3cne\t3/11/2026 20:17\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tdoriss911\t5750 \t0 \t5750 \t',
+        '',
+        'uszs\t3/11/2026 21:10\tRETIRO (Solicitado por 29722092)\tclauxxdia3\tnaycelu543\t0 \t-33.000 \t-33.000 \t',
+        's134\t3/11/2026 22:48\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\troddrigg.33\t5000 \t0 \t5000 \t',
+        '',
+        'i0av\t3/11/2026 23:03\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tcam13\t2600 \t0 \t2600 ',
+        '',
+        'aj70\t3/11/2026 23:11\tDEPOSITO (Solicitado por 29722092)\tnaycelu543\tmariaweigelx\t3000 \t0 \t3000 \t'
+      ].join('\n');
+      processCleaner();
+      showToast('✅ Ejemplo cargado en limpio');
+    }
+
+    // Cargar automáticamente el ejemplo que enviaste al abrir por primera vez
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSampleCleaner();
+    });
+  </script>
+</body>
+</html>
+

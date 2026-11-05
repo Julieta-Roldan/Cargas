@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verificador de Transferencias — Panel vs Google Sheets</title>
+  <!-- SheetJS para leer y exportar archivos Excel (.xlsx, .xls, .csv) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF y AutoTable para generar reportes PDF limpios y formales -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <!-- Estilos separados -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- ENCABEZADO PRINCIPAL -->
+    <header class="app-header">
+      <div class="brand-box">
+        <div class="brand-icon">🔍</div>
+        <div>
+          <h1>Verificador de Transferencias (Panel vs Google Sheets)</h1>
+          <p>Enlazado en vivo con Google Sheets · Orden cronológico · Navegación con flechas y doble clic</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a href="cargas.html" class="btn btn-primary" style="text-decoration: none; background: #10b981; border-color: #059669;" title="Abrir pantalla rápida de cargas y retiros para trabajadoras">⚡ Cargas Trabajadoras</a>
+        <button class="btn btn-success" onclick="syncActiveWorkerSource(false)" title="Traer últimos datos de Trabajadoras (Supabase o Google Sheets)">🔄 Sincronizar Datos</button>
+        <button class="btn btn-primary" onclick="openPdfModal()" title="Generar reporte PDF personalizado para entregar">📄 Generar PDF</button>
+        <a href="limpiador.html" class="btn btn-outline" style="text-decoration: none; border-color: #38bdf8; color: #7dd3fc;" title="Ir al limpiador rápido de texto del Panel">🧹 Limpiador de Texto</a>
+        <button class="btn btn-outline" onclick="startProductTour()">🎯 Tour Guiado</button>
+        <button class="btn btn-outline" onclick="openHelpModal()">❓ Cómo usar / Ayuda</button>
+        <button class="btn btn-outline" onclick="loadDemoData()">🧪 Probar Panel</button>
+        <button class="btn btn-outline" onclick="clearAll()">🗑️ Limpiar Panel</button>
+      </div>
+    </header>
+
+    <!-- DROP 1: SECCIÓN PLEGABLE DE CARGA DE DATOS (PANEL Y GOOGLE SHEETS) -->
+    <section class="drop-section" id="dropInputs">
+      <div class="drop-header" onclick="toggleDropSection('dropInputs')">
+        <div class="drop-header-left">
+          <span class="drop-chevron">▼</span>
+          <span>📥 Entrada de Datos (Panel Administrativo y Google Sheets en Vivo)</span>
+        </div>
+        <div class="summary-pills">
+          <span class="mini-pill">Panel: <strong id="pillPanelCount">0</strong> mov.</span>
+          <span class="mini-pill">Google Sheets: <strong id="pillExcelCount">0</strong> mov.</span>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Clic para plegar/desplegar</span>
+        </div>
+      </div>
+
+      <div class="drop-body">
+        <div class="input-grid">
+          <!-- PASO 1: PANEL -->
+          <div class="subcard" id="stepCardPanel">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="badge-step">1</span>
+                Pegar datos del Panel Administrativo
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <a href="limpiador.html" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.78rem; text-decoration: none; border-color: #38bdf8; color: #7dd3fc;">
+                  🧹 Pasar en Limpio ↗
+                </a>
+                <span id="panelCountBadge" style="font-size: 0.8rem; color: var(--text-muted);">0 movimientos</span>
+              </div>
+            </div>
+            <textarea
+              id="panelInput"
+              placeholder="Copia y pega aquí las filas del panel...&#10;Ejemplo:&#10;1ufz	3/11/2026 15:34	DEPOSITO (Solicitado por 29722092)	naycelu543	espindolaliliana1	2000 	0 	2000 	&#10;b3ni	3/11/2026 15:30	DEPOSITO (Solicitado por 29722092)	naycelu543	rominaweigel2	5000 	0 	5000 	&#10;tjx3	3/11/2026 15:30	DEPOSITO (Solicitado por 29722092)	naycelu543	roxanabt091	30.000 	0 	30.000"
+            ></textarea>
+          </div>
+
+          <!-- PASO 2: GOOGLE SHEETS / EXCEL -->
+          <div class="subcard" id="stepCardExcel">
+            <div class="card-header">
+              <div class="card-title">
+                <span class="badge-step">2</span>
+                Planilla de los Trabajadores
+              </div>
+              <div class="tabs-mode">
+                <button id="btnModeSupabase" class="tab-btn" onclick="setExcelMode('supabase')">☁️ Supabase (Trabajadoras)</button>
+                <button id="btnModeGsheet" class="tab-btn active" onclick="setExcelMode('gsheet')">🔗 Google Sheets</button>
+                <button id="btnModeFile" class="tab-btn" onclick="setExcelMode('file')">📁 Subir Archivo</button>
+                <button id="btnModePaste" class="tab-btn" onclick="setExcelMode('paste')">📋 Pegar Celdas</button>
+              </div>
+            </div>
+
+            <!-- MODO SUPABASE (CARGAS.HTML) -->
+            <div id="excelSupabaseContainer" style="display: none;">
+              <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                  <div>
+                    <strong style="font-size: 0.88rem; color: #f8fafc;">☁️ Datos cargados desde <code>cargas.html</code> (Supabase)</strong>
+                    <div id="supabaseVerifierStatus" style="font-size: 0.8rem; color: #34d399; margin-top: 3px;">Listo para sincronizar...</div>
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="btnSyncSupabase" onclick="syncSupabaseMovimientos(false)">🔄 Traer Cargas Ahora</button>
+                    <a href="cargas.html" class="btn btn-outline" style="text-decoration: none;">⚡ Abrir Cargas.html ↗</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODO GOOGLE SHEETS EN VIVO (POR DEFECTO) -->
+            <div id="excelGsheetContainer">
+              <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px;">
+                <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">
+                  Enlace de Google Sheets conectado:
+                </label>
+                <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                  <input
+                    type="text"
+                    id="gsheetUrlInput"
+                    value="https://docs.google.com/spreadsheets/d/1WQ6FCsFy0nG9srQ4nZFQGrX0gM7CI0SMqLuyKvFdCp4/edit?usp=sharing"
+                    style="flex: 1; min-width: 220px; font-family: 'Consolas', monospace; font-size: 0.8rem;"
+                  />
+                  <button class="btn btn-primary" id="btnSyncGsheet" onclick="syncGoogleSheet(false)">
+                    🔄 Sincronizar Ahora
+                  </button>
+                  <button class="btn btn-outline" onclick="openGoogleSheetInTab()" title="Abrir Google Sheets en otra pestaña">
+                    ↗️ Abrir Hoja
+                  </button>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.83rem;">
+                  <span id="gsheetStatusText" style="color: #34d399;">Conectando con Google Sheets...</span>
+                  <label style="display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); cursor: pointer;">
+                    <input type="checkbox" id="autoSyncToggle" onchange="toggleAutoSync(this.checked)" />
+                    Auto-actualizar cada 30 seg
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODO SUBIR ARCHIVO -->
+            <div id="excelFileContainer" style="display: none;">
+              <label class="dropzone" id="dropzone">
+                <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" />
+                <div class="dropzone-icon">📊</div>
+                <div class="dropzone-title" id="dropzoneTitle">Haz clic o arrastra el archivo Excel aquí</div>
+                <div class="dropzone-sub">Soporta .xlsx, .xls y .csv (Columnas: Usuario, Carga, Retiro, Hora, Billetera, ok)</div>
+              </label>
+            </div>
+
+            <!-- MODO PEGAR CELDAS -->
+            <div id="excelPasteContainer" style="display: none;">
+              <textarea
+                id="excelPasteInput"
+                placeholder="También puedes copiar y pegar las celdas directamente desde Excel o Google Sheets aquí...&#10;Usuario	Carga	Retiro	Hora	Billetera	ok&#10;Roxanabt091	30.000				"
+              ></textarea>
+            </div>
+
+            <!-- BARRA DE METADATOS / SELECTOR DE HOJA -->
+            <div class="excel-meta" id="excelMetaBar" style="display: none;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span>📄 <strong id="fileNameLabel">Control_GoogleSheets.xlsx</strong></span>
+                <label id="sheetSelectorWrap" style="display: none; font-size: 0.84rem; color: var(--text-muted);">
+                  Pestaña/Hoja:
+                  <select id="sheetSelect" onchange="onSheetChange()"></select>
+                </label>
+              </div>
+              <span id="excelCountBadge" style="font-size: 0.8rem; color: var(--text-muted);">0 registros</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTONERA RÁPIDA DE DÍAS Y TURNOS CARGADOS -->
+    <div class="day-selector-bar" id="daySelectorBar">
+      <div class="day-selector-row">
+        <div class="day-selector-label">
+          <span>📅 Elegir Día:</span>
+          <span class="active-day-badge" id="activeDayHeaderBadge">Auto</span>
+        </div>
+        <div class="day-buttons-wrap" id="dayButtonsContainer">
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Detectando días en Google Sheets...</span>
+        </div>
+      </div>
+
+      <div class="day-selector-row shift-row" id="shiftSelectorRow" style="display: none;">
+        <div class="day-selector-label">
+          <span>👥 Bloque / Turno:</span>
+        </div>
+        <div class="shift-buttons-wrap" id="shiftButtonsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TARJETAS DE RESUMEN / FILTROS -->
+    <div class="stats-grid" id="statsSection">
+      <div class="stat-card all active" onclick="setFilter('all')" id="card-all">
+        <div class="stat-label">Total Movimientos</div>
+        <div class="stat-value" id="stat-all">0</div>
+        <div class="stat-sub">Clic para ver todos</div>
+      </div>
+      <div class="stat-card matched" onclick="setFilter('matched')" id="card-matched">
+        <div class="stat-label">✅ Coinciden Exacto</div>
+        <div class="stat-value" id="stat-matched">0</div>
+        <div class="stat-sub">Mismo usuario y monto</div>
+      </div>
+      <div class="stat-card similar" onclick="setFilter('similar')" id="card-similar">
+        <div class="stat-label">🔤 Nombre Similar / Suma</div>
+        <div class="stat-value" id="stat-similar">0</div>
+        <div class="stat-sub">Mismo monto, usuario abreviado</div>
+      </div>
+      <div class="stat-card diff" onclick="setFilter('diff')" id="card-diff">
+        <div class="stat-label">⚠️ Monto Diferente</div>
+        <div class="stat-value" id="stat-diff">0</div>
+        <div class="stat-sub">Mismo usuario, distinto valor</div>
+      </div>
+      <div class="stat-card only-panel" onclick="setFilter('only_panel')" id="card-only_panel">
+        <div class="stat-label">🚨 Falta en el Excel</div>
+        <div class="stat-value" id="stat-only-panel">0</div>
+        <div class="stat-sub">Está en el Panel, NO en el Excel</div>
+      </div>
+      <div class="stat-card only-excel" onclick="setFilter('only_excel')" id="card-only_excel">
+        <div class="stat-label">🟣 Falta en el Panel</div>
+        <div class="stat-value" id="stat-only-excel">0</div>
+        <div class="stat-sub">Está en el Excel, NO en el Panel</div>
+      </div>
+    </div>
+
+    <!-- DROP 2: RESUMEN FINANCIERO PLEGABLE -->
+    <section class="drop-section" id="dropTotals">
+      <div class="drop-header" onclick="toggleDropSection('dropTotals')">
+        <div class="drop-header-left">
+          <span class="drop-chevron">▼</span>
+          <span>💰 Balance de Totales (Depósitos y Retiros)</span>
+        </div>
+        <div class="totals-bar" onclick="event.stopPropagation()">
+          <div class="totals-item">
+            <span>Depósitos Panel:</span>
+            <strong id="totPanelDep">$ 0</strong>
+          </div>
+          <div class="totals-item">
+            <span>Cargas Sheets:</span>
+            <strong id="totExcelDep">$ 0</strong>
+          </div>
+          <div class="totals-item">
+            <span>Diferencia Cargas:</span>
+            <strong id="totDiffDep">$ 0</strong>
+          </div>
+          <div style="border-left: 1px solid var(--border); height: 18px;"></div>
+          <div class="totals-item">
+            <span>Retiros Panel:</span>
+            <strong id="totPanelRet">$ 0</strong>
+          </div>
+          <div class="totals-item">
+            <span>Retiros Sheets:</span>
+            <strong id="totExcelRet">$ 0</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BARRA DE HERRAMIENTAS CON DROPDOWNS -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="🔎 Buscar usuario, monto, billetera, fila o ID..."
+          oninput="renderTable()"
+          style="min-width: 250px;"
+        />
+        <select id="sortOrderSelect" onchange="renderTable()" title="Orden de la tabla">
+          <option value="time_asc">🕒 Horario (00:00 → 23:59)</option>
+          <option value="time_desc">🕒 Horario (Más reciente primero)</option>
+          <option value="excel_row">🔢 Fila de Sheets (#1 → final)</option>
+          <option value="status">📌 Estado (Alertas primero)</option>
+        </select>
+        <select id="typeFilter" onchange="renderTable()">
+          <option value="auto">Tipo automático (según Panel)</option>
+          <option value="all">Todos (Cargas y Retiros)</option>
+          <option value="DEPOSITO">Solo Cargas / Depósitos</option>
+          <option value="RETIRO">Solo Retiros</option>
+        </select>
+        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--text-muted); cursor: pointer;">
+          <input type="checkbox" id="hideCheckedToggle" onchange="renderTable()" />
+          Ocultar marcados con OK
+        </label>
+      </div>
+
+      <div class="toolbar-right">
+        <!-- DROPDOWN DE VISTA / DETALLES -->
+        <div class="dropdown" id="viewDropdownWrap">
+          <button class="btn btn-outline" onclick="toggleDropdownMenu('viewDropdownWrap', event)">
+            📂 Detalles de Filas ▾
+          </button>
+          <div class="dropdown-menu">
+            <button class="dropdown-item" onclick="expandAllInlineDrops(true)">
+              <span>🔽</span> Desplegar todos los detalles en tabla
+            </button>
+            <button class="dropdown-item" onclick="expandAllInlineDrops(false)">
+              <span>🔼</span> Contraer todos los detalles
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" onclick="openComparisonModalForSelected()">
+              <span>🔎</span> Abrir comparador de fila actual
+            </button>
+          </div>
+        </div>
+
+        <!-- DROPDOWN DE ACCIONES Y EXPORTACIÓN -->
+        <div class="dropdown" id="exportDropdownWrap">
+          <button class="btn btn-success" onclick="toggleDropdownMenu('exportDropdownWrap', event)">
+            ⚡ Acciones OK y Exportar ▾
+          </button>
+          <div class="dropdown-menu">
+            <button class="dropdown-item" onclick="checkAllMatched()">
+              <span>☑️</span> Marcar todas las coincidencias como OK
+            </button>
+            <button class="dropdown-item" onclick="uncheckAll()">
+              <span>🔄</span> Desmarcar todos los OK
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" onclick="copyOkColumn()">
+              <span>📋</span> Copiar columna 'ok' para pegar en Google Sheets
+            </button>
+            <button class="dropdown-item" onclick="exportUpdatedExcel()">
+              <span>📥</span> Descargar Excel (.xlsx) con 'ok' actualizado
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" onclick="openPdfModal()">
+              <span>📄</span> Generar Reporte en PDF...
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BARRA DE ATAJOS DE TECLADO -->
+    <div class="kbd-hint-bar">
+      <div>
+        💡 <strong>Atajos rápidos:</strong>
+        <strong>1 Clic</strong> selecciona la fila ·
+        <kbd>↑</kbd> <kbd>↓</kbd> sube y baja ·
+        <kbd>→</kbd> o <kbd>Espacio</kbd> marca/desmarca <strong>OK</strong> ·
+        Botón <kbd>▼</kbd> despliega todos los datos en la fila ·
+        <strong>Doble Clic</strong> o <kbd>Enter</kbd> abre la comparación lado a lado.
+      </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL DE RESULTADOS -->
+    <div class="table-wrapper" id="tableSection">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 46px; text-align: center;">OK</th>
+            <th style="width: 42px; text-align: center;" title="Desplegar detalles completos">Drop</th>
+            <th style="width: 78px;">Horario</th>
+            <th>Usuario (Sheets ↔ Panel)</th>
+            <th style="text-align: right; min-width: 125px;">Monto Panel</th>
+            <th style="text-align: right; min-width: 125px;">Monto Sheets</th>
+            <th>Estado</th>
+            <th>Tipo</th>
+            <th style="text-align: right;">Diferencia</th>
+            <th>ID / Billetera</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr>
+            <td colspan="10" class="empty-state">
+              Sincronizando con Google Sheets... Pega los movimientos del Panel Administrativo para comparar.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BARRA FLOTANTE DE NAVEGACIÓN INFERIOR -->
+  <div class="floating-nav" id="floatingNav" style="display: none;">
+    <button class="btn" onclick="moveSelection(-1)" title="Subir a la fila anterior (Flecha Arriba)">⬆️ Anterior</button>
+    <span class="nav-pos" id="navPosLabel">Fila 0 / 0</span>
+    <button class="btn" onclick="moveSelection(1)" title="Bajar a la siguiente fila (Flecha Abajo)">⬇️ Siguiente</button>
+    <div style="border-left: 1px solid var(--border); height: 22px;"></div>
+    <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK (Tecla Espacio)">☑️ Marcar OK</button>
+    <button class="btn btn-primary" onclick="openComparisonModalForSelected()" title="Ver detalle comparativo (Doble Clic o Enter)">🔍 Comparar</button>
+  </div>
+
+  <!-- MODAL 1: COMPARACIÓN DETALLADA LADO A LADO (DOBLE CLIC) -->
+  <div class="modal-backdrop" id="compareModal" onclick="onBackdropClick(event, 'compareModal')">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <h2 style="font-size: 1.15rem;">🔎 Comparación Lado a Lado: Panel vs Google Sheets</h2>
+          <span id="modalStatusBadge"></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn" onclick="moveSelection(-1)" title="Anterior (Flecha Arriba)">⬆️ Anterior</button>
+          <button class="btn" onclick="moveSelection(1)" title="Siguiente (Flecha Abajo)">⬇️ Siguiente</button>
+          <button class="btn btn-outline" onclick="closeComparisonModal()">✖ Cerrar <kbd>Esc</kbd></button>
+        </div>
+      </div>
+
+      <div class="modal-body" id="modalBodyContent"></div>
+
+      <div class="modal-footer">
+        <div style="font-size: 0.82rem; color: var(--text-muted);">
+          Usa las flechas <kbd>↑</kbd> <kbd>↓</kbd> para recorrer los movimientos sin cerrar esta ventana, y <kbd>→</kbd> o <kbd>Espacio</kbd> para marcar OK.
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-success" id="modalToggleOkBtn" onclick="toggleSelectedCheck()">☑️ Marcar como OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CENTRO DE AYUDA / CÓMO USAR LA APLICACIÓN -->
+  <div class="modal-backdrop" id="helpModal" onclick="onBackdropClick(event, 'helpModal')">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 style="font-size: 1.2rem;">📖 Guía de Uso: ¿Cómo verificar tus transferencias?</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary" onclick="startProductTour()">🎯 Iniciar Tour Interactivo</button>
+          <button class="btn btn-outline" onclick="closeHelpModal()">✖ Cerrar</button>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="help-grid">
+          <div class="help-card">
+            <h4>1️⃣ Pegar datos del Panel</h4>
+            <p>Selecciona en tu Panel Administrativo las filas de movimientos, cópialas (<kbd>Ctrl</kbd>+<kbd>C</kbd>) y pégalas (<kbd>Ctrl</kbd>+<kbd>V</kbd>) en el cuadro del <strong>Paso 1</strong>.</p>
+            <ul>
+              <li>No importa si se copian los encabezados o la fila de <code>TOTALES</code>, el sistema los filtra solo.</li>
+              <li>Se conservan todos los datos: <strong>ID, Fecha, Hora, Operación, Agente, Destino, Depósito, Retiro y Saldo</strong>.</li>
+            </ul>
+          </div>
+
+          <div class="help-card">
+            <h4>2️⃣ Google Sheets Conectado en Vivo</h4>
+            <p>En el <strong>Paso 2</strong> tu hoja de Google Sheets ya está enlazada automáticamente.</p>
+            <ul>
+              <li>Haz clic en <strong>🔄 Sincronizar Ahora</strong> cada vez que quieras traer los últimos movimientos anotados por los trabajadores.</li>
+              <li>También puedes activar <strong>Auto-actualizar cada 30 seg</strong> para que se refresque sola.</li>
+            </ul>
+          </div>
+
+          <div class="help-card">
+            <h4>3️⃣ Entender los Estados y Colores</h4>
+            <ul>
+              <li><strong style="color: #34d399;">✅ Coincide Exacto:</strong> Mismo usuario y mismo monto.</li>
+              <li><strong style="color: #7dd3fc;">🔤 Nombre Similar / Suma:</strong> El trabajador abrevió el usuario (ej. <code>Ferfranguell</code> vs <code>ferfranguella0</code>) o anotó juntas 2 cargas seguidas del mismo usuario.</li>
+              <li><strong style="color: #fbbf24;">⚠️ Monto Diferente:</strong> El usuario está en ambos, pero el dinero anotado no coincide.</li>
+              <li><strong style="color: #f87171;">🚨 Falta en el Excel:</strong> Se cargó en el Panel pero el trabajador olvidó anotarlo.</li>
+              <li><strong style="color: #c084fc;">🟣 Falta en el Panel:</strong> Está en Google Sheets pero no figura en el Panel pegado.</li>
+            </ul>
+          </div>
+
+          <div class="help-card">
+            <h4>4️⃣ Navegación con Teclado y Drops</h4>
+            <ul>
+              <li><strong>1 Clic en una fila:</strong> La deja seleccionada (resaltada en azul).</li>
+              <li><strong>Flechas <kbd>↑</kbd> y <kbd>↓</kbd>:</strong> Subes y bajas por la lista.</li>
+              <li><strong>Flecha <kbd>→</kbd> o <kbd>Espacio</kbd>:</strong> Marca o desmarca el <code>OK</code> de la fila seleccionada.</li>
+              <li><strong>Botón <kbd>▼</kbd> (Drop):</strong> Despliega en el lugar todos los datos crudos de esa fila sin abrir ventanas.</li>
+              <li><strong>Doble Clic o <kbd>Enter</kbd>:</strong> Abre la ventana comparativa enfrentando Panel vs Google Sheets y mostrando las filas vecinas.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span style="font-size: 0.82rem; color: var(--text-muted);">Estructura modular separada en <code>css/</code> y <code>js/</code> para fácil mantenimiento.</span>
+        <button class="btn btn-primary" onclick="closeHelpModal()">¡Entendido!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: GENERADOR DE REPORTE PDF -->
+  <div class="modal-backdrop" id="pdfModal" onclick="onBackdropClick(event, 'pdfModal')">
+    <div class="modal-box" style="width: min(860px, 100%);">
+      <div class="modal-header">
+        <div>
+          <h2 style="font-size: 1.18rem;">📄 Generar Reporte en PDF para Entregar</h2>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            Elige qué tipo de reporte quieres armar o marca manualmente las secciones a incluir (formato A4 limpio y listo para compartir).
+          </p>
+        </div>
+        <button class="btn btn-outline" onclick="closePdfModal()">✖ Cerrar <kbd>Esc</kbd></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- PLANTILLAS RÁPIDAS -->
+        <div style="margin-bottom: 6px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted);">
+          1️⃣ Selección rápida: ¿Qué tipo de PDF quieres generar?
+        </div>
+        <div class="preset-bar">
+          <button class="preset-btn active" data-preset="observations" onclick="selectPdfPreset('observations')">
+            📋 Reporte de Observaciones (Todo lo que hay para corregir)
+          </button>
+          <button class="preset-btn" data-preset="missing_excel" onclick="selectPdfPreset('missing_excel')">
+            🚨 Solo Cargas que NO están en el Excel
+          </button>
+          <button class="preset-btn" data-preset="bad_names" onclick="selectPdfPreset('bad_names')">
+            🔤 Solo Nombres de Usuario mal escritos
+          </button>
+          <button class="preset-btn" data-preset="diffs" onclick="selectPdfPreset('diffs')">
+            ⚠️ Solo Diferencias de Dinero y Faltantes
+          </button>
+          <button class="preset-btn" data-preset="full" onclick="selectPdfPreset('full')">
+            📊 Auditoría Completa (Incluye Correctos)
+          </button>
+        </div>
+
+        <!-- OPCIONES INDIVIDUALES -->
+        <div style="margin-bottom: 8px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted);">
+          2️⃣ Secciones a incluir en el documento (puedes tildar o destildar a gusto):
+        </div>
+        <div class="pdf-options-grid">
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkOnlyPanel" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>🚨 Cargas/Movimientos que NO están en el Excel</span>
+                <span class="pdf-count-pill" id="pdfCountOnlyPanel">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Lista detallada con ID, horario, usuario y monto de las cargas hechas en el Panel que los trabajadores olvidaron anotar en la planilla.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkBadNames" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>🔤 Usuarios mal escritos en el Excel</span>
+                <span class="pdf-count-pill" id="pdfCountBadNames">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Muestra la fila del Excel, cómo lo escribió el trabajador (incorrecto/abreviado) y cuál es el usuario real exacto en el Panel.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkDiff" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>⚠️ Diferencias de Monto (Panel vs Excel)</span>
+                <span class="pdf-count-pill" id="pdfCountDiff">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Movimientos donde el usuario coincide pero el monto anotado en el Excel no es igual al cargado en el Panel.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkOnlyExcel" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>🟣 Anotados en el Excel que NO están en el Panel</span>
+                <span class="pdf-count-pill" id="pdfCountOnlyExcel">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Filas registradas por los trabajadores en la hoja de cálculo que no figuran en el listado del Panel pegado.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkSumCharges" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>➕ Cargas divididas en Panel (sumadas en Excel)</span>
+                <span class="pdf-count-pill" id="pdfCountSumCharges">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Casos donde 2 cargas seguidas del mismo usuario en el Panel fueron anotadas en una sola fila sumada en el Excel.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card">
+            <input type="checkbox" id="pdfChkSummary" checked />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>📌 Cuadro de Resumen General y Totales</span>
+              </div>
+              <div class="pdf-option-desc">
+                Agrega al inicio del PDF un recuadro con la cantidad de movimientos revisados, coincidencias, observaciones y montos totales.
+              </div>
+            </div>
+          </label>
+
+          <label class="pdf-option-card" style="grid-column: 1 / -1;">
+            <input type="checkbox" id="pdfChkMatched" />
+            <div class="pdf-option-info">
+              <div class="pdf-option-title">
+                <span>✅ Incluir anexo con todos los movimientos que coinciden exacto</span>
+                <span class="pdf-count-pill" id="pdfCountMatched">0</span>
+              </div>
+              <div class="pdf-option-desc">
+                Actívalo solo si necesitas un PDF completo con absolutamente todas las filas verificadas sin errores.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- DATOS DEL ENCABEZADO Y FILTRO -->
+        <div style="margin-bottom: 8px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted);">
+          3️⃣ Datos del Encabezado y Nota opcional:
+        </div>
+        <div class="pdf-meta-grid">
+          <div class="pdf-field">
+            <label for="pdfTitleInput">Título del documento</label>
+            <input type="text" id="pdfTitleInput" value="Reporte de Observaciones: Panel vs Planilla" />
+          </div>
+          <div class="pdf-field">
+            <label for="pdfShiftInput">Turno / Responsables</label>
+            <input type="text" id="pdfShiftInput" placeholder="Ej: Turno Mañana - Pri y Nayla" />
+          </div>
+          <div class="pdf-field">
+            <label for="pdfDateInput">Fecha y Hora del Reporte</label>
+            <input type="text" id="pdfDateInput" />
+          </div>
+          <div class="pdf-field">
+            <label for="pdfTypeFilter">Movimientos a evaluar</label>
+            <select id="pdfTypeFilter" onchange="updatePdfModalCounts()">
+              <option value="auto">Según filtro actual de la pantalla</option>
+              <option value="all">Todos (Cargas y Retiros)</option>
+              <option value="DEPOSITO">Solo Cargas / Depósitos</option>
+              <option value="RETIRO">Solo Retiros</option>
+            </select>
+          </div>
+          <div class="pdf-field" style="grid-column: 1 / -1;">
+            <label for="pdfNoteInput">Nota o mensaje para los trabajadores (opcional)</label>
+            <textarea id="pdfNoteInput" placeholder="Ej: Por favor revisar las cargas faltantes en la planilla y escribir los nombres de usuario tal cual figuran en el panel..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">
+          Formato hoja A4 blanca, tipografía clara y tablas formales listas para enviar por WhatsApp o imprimir.
+        </span>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline" onclick="closePdfModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="generatePdfDocument()">📥 Descargar PDF Ahora</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOLTIP FLOTANTE DEL PRODUCT TOUR -->
+  <div class="tour-tooltip" id="tourTooltip">
+    <span class="tour-step-badge" id="tourBadge">Paso 1 de 5</span>
+    <h4 id="tourTitle">Título del paso</h4>
+    <p id="tourText">Descripción del paso...</p>
+    <div class="tour-footer">
+      <button class="btn btn-outline" onclick="endProductTour()" style="font-size: 0.78rem; padding: 6px 10px;">Saltar tour</button>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn" id="tourPrevBtn" onclick="prevTourStep()" style="font-size: 0.8rem; padding: 6px 11px;">← Anterior</button>
+        <button class="btn btn-primary" id="tourNextBtn" onclick="nextTourStep()" style="font-size: 0.8rem; padding: 6px 12px;">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- SCRIPTS MODULARES SEPARADOS -->
+  <script src="js/state.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/parsers.js"></script>
+  <script src="js/matcher.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/tour.js"></script>
+</body>
+</html>
