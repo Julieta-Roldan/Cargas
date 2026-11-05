@@ -576,6 +576,14 @@ create policy "Acceso publico total movimientos"
     const DEFAULT_WALLETS = ['Mp morena', 'Mp', 'Brubank', 'Uala', 'Naranja X'];
 
     window.addEventListener('DOMContentLoaded', () => {
+      // Bloquear el botón "Atrás" del navegador: si alguien toca atrás en el celular o PC, lo mantiene siempre en cargas.html
+      try {
+        window.history.pushState(null, '', window.location.href);
+        window.addEventListener('popstate', () => {
+          window.history.pushState(null, '', window.location.href);
+        });
+      } catch (err) {}
+
       const savedShift = localStorage.getItem('worker_active_shift_v1') || 'Turno Actual';
       document.getElementById('workerShiftInput').value = savedShift;
 
