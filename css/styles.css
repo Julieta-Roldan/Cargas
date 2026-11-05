@@ -800,10 +800,18 @@ tr.row-diff .amount-highlight {
   letter-spacing: 0.01em;
 }
 
+.user-highlight-retiro {
+  color: #fb923c !important;
+}
+
 tr.row-selected .user-highlight,
 tr.row-selected .amount-highlight {
   color: #ffffff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+tr.row-selected .user-highlight.user-highlight-retiro {
+  color: #fed7aa !important;
 }
 
 .user-panel-tag {

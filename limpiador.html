@@ -205,76 +205,67 @@
     }
 
     function parseRawCleanerLines(raw) {
-      const normalizedRaw = String(raw || '').replace(/(\S)\s+([a-z0-9]{4}\t\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})/gi, '$1\n$2');
-      const rawLines = normalizedRaw.split(/\r?\n/);
+      let text = String(raw || '');
+      if (!text.trim()) return [];
 
-      const mergedLines = [];
-      for (let i = 0; i < rawLines.length; i++) {
-        const line = rawLines[i].trim();
-        if (!line) continue;
-        if (/^Nro\s+Fecha/i.test(line) || /^TOTALES/i.test(line)) continue;
+      // Limpiar enlaces markdown si se copiaron así
+      text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
 
-        const startsNewRecord = /^[a-z0-9]{3,10}\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i.test(line);
-        if (startsNewRecord || mergedLines.length === 0) {
-          mergedLines.push(line);
-        } else {
-          mergedLines[mergedLines.length - 1] += ' ' + line;
-        }
-      }
+      const seenIds = new Set();
+      const rawMatches = [];
+
+      const recRegex8 = /([a-z0-9]{3,10})\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+((?:DEPOSITO|DEPÓSITO|RETIRO)(?:\s*\([^\)]*\))?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)\s+([-\d.,]+)/gi;
+      text = text.replace(recRegex8, (fullMatch, id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr, saldoStr) => {
+        rawMatches.push({ id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr, saldoStr });
+        return '\n';
+      });
+
+      const recRegex7 = /([a-z0-9]{3,10})\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+((?:DEPOSITO|DEPÓSITO|RETIRO)(?:\s*\([^\)]*\))?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)/gi;
+      text = text.replace(recRegex7, (fullMatch, id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr) => {
+        rawMatches.push({ id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr, saldoStr: '0' });
+        return '\n';
+      });
 
       const items = [];
-      mergedLines.forEach((line, idx) => {
-        const parts = line.split('\t').map(s => s.trim()).filter(Boolean);
-        let id, fechaCompleta, operacionRaw, agente, destino, dep = 0, ret = 0;
-        let parsedOk = false;
+      rawMatches.forEach((m, idx) => {
+        const idClean = String(m.id || '').trim();
+        const key = `${idClean.toLowerCase()}|${m.fechaCompleta}`;
+        if (seenIds.has(key)) return;
+        seenIds.add(key);
 
-        if (parts.length >= 6) {
-          id = parts[0];
-          fechaCompleta = parts[1];
-          operacionRaw = parts[2];
-          agente = parts[3];
-          destino = parts[4];
-          dep = Math.abs(parseAmount(parts[5]));
-          ret = Math.abs(parseAmount(parts[6]));
-          parsedOk = (dep > 0 || ret > 0);
-        } else {
-          const regex = /^(\S+)\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+(.+?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)(?:\s+([-\d.,]+))?$/;
-          const match = line.match(regex);
-          if (match) {
-            [, id, fechaCompleta, operacionRaw, agente, destino, depStr, retStr] = match;
-            dep = Math.abs(parseAmount(depStr));
-            ret = Math.abs(parseAmount(retStr));
-            parsedOk = (dep > 0 || ret > 0);
-          }
+        const dep = Math.abs(parseAmount(m.depStr));
+        const ret = Math.abs(parseAmount(m.retStr));
+        if (dep === 0 && ret === 0) return;
+
+        const isRetiroOp = /RETIRO/i.test(m.operacionRaw) || (ret > 0 && dep === 0);
+        const tipo = isRetiroOp ? 'RETIRO' : 'DEPOSITO';
+        const tipoLabel = isRetiroOp ? 'Retiro' : 'Carga (Depósito)';
+        const monto = isRetiroOp ? ret : dep;
+
+        let usuario = m.destino;
+        if (isRetiroOp && normalizeUser(m.destino) === 'naycelu543') {
+          usuario = m.agente;
+        }
+        // Ignorar recargas de fichas internas a naycelu543
+        if (!isRetiroOp && normalizeUser(m.destino) === 'naycelu543') {
+          return;
         }
 
-        if (parsedOk) {
-          const isRetiroOp = /RETIRO/i.test(operacionRaw) || (ret > 0 && dep === 0);
-          const tipo = isRetiroOp ? 'RETIRO' : 'DEPOSITO';
-          const tipoLabel = isRetiroOp ? 'Retiro' : 'Carga (Depósito)';
-          const monto = isRetiroOp ? ret : dep;
+        const dt = parsePanelDateTime(m.fechaCompleta);
+        const fechaSolo = m.fechaCompleta.split(/\s+/)[0] || m.fechaCompleta;
 
-          let usuario = destino;
-          if (isRetiroOp && normalizeUser(destino) === 'naycelu543') {
-            usuario = agente;
-          }
-
-          const dt = parsePanelDateTime(fechaCompleta);
-          const fechaSolo = fechaCompleta.split(/\s+/)[0] || fechaCompleta;
-
-          items.push({
-            idxOriginal: idx + 1,
-            id,
-            horario: dt.timeStr || fechaCompleta.split(/\s+/)[1] || '',
-            fecha: fechaSolo,
-            usuario,
-            monto,
-            tipo,
-            tipoLabel,
-            timestamp: dt.timestamp,
-            minutesOfDay: dt.minutesOfDay
-          });
-        }
+        items.push({
+          idxOriginal: idx + 1,
+          id: idClean,
+          horario: dt.timeStr || m.fechaCompleta.split(/\s+/)[1] || '',
+          fecha: fechaSolo,
+          usuario,
+          monto,
+          tipo,
+          tipoLabel,
+          timestamp: dt.timestamp,
+          minutesOfDay: dt.minutesOfDay
+        });
       });
 
       return items;

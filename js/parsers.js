@@ -2,98 +2,285 @@
 // PARSERS DE DATOS: PANEL, EXCEL Y GOOGLE SHEETS EN VIVO (parsers.js)
 // =========================================================
 
+// Patrones conocidos de textos de menú, filtros, encabezados, totales y pie de página de admin.celuapuestas.fans
+function isKnownPanelNoiseLine(line) {
+  const s = String(line || '').trim();
+  if (!s) return true;
+  const knownPatterns = [
+    /^[a-z0-9_.-]+\s*\(\s*[-\d.,]+\s*\)$/i, // ej: naycelu543 (1.191.233 )
+    /^(?:dashboard|usuarios|reportes|novedades|soporte|\s)+$/i,
+    /^efectivo\s*\(dep[oó]sitos\s+y\s+retiros\)$/i,
+    /^\/?\s*informes\s+financieros$/i,
+    /^fecha\s+(?:desde|hasta)$/i,
+    /^\d{1,2}\/\d{1,2}\/\d{2,4}(?:\s+\d{1,2}:\d{2})?$/, // fechas sueltas de los selectores "Fecha desde / Fecha hasta"
+    /^(?:hrmin|hr|min)$/i,
+    /^buscar\s+usuario$/i,
+    /^solo\s+(?:directos|superiores|recibidas)(?:\s+solo\s+(?:directos|superiores|recibidas))*$/i,
+    /^filtrando\s+desde\s+/i,
+    /^(?:nro|fecha|operaci[oó]n|agente|destino|dep[oó]sito|retiro|saldo)(?:\s+(?:nro|fecha|operaci[oó]n|agente|destino|dep[oó]sito|retiro|saldo))*$/i,
+    /^totales(?:\s+(?:dep[oó]sito|retiro|saldo)\s*:\s*[-\d.,]+)*$/i,
+    /^(?:(?:dep[oó]sito|retiro|saldo)\s*:\s*[-\d.,]+\s*)+$/i,
+    /^(?:««|«|»|»»|\d{1,3})(?:\s+(?:««|«|»|»»|\d{1,3}))*$/,
+    /^(?:centro\s+de\s+ayuda|cont[aá]ctanos|\s)+$/i,
+    /^legal$/i,
+    /^(?:t[eé]rminos\s+y\s+condiciones|pol[ií]tica\s+de\s+privacidad|\s)+$/i,
+    /^redes\s+sociales$/i,
+    /^©\s*\d{4}.*derechos\s+reservados\.?$/i
+  ];
+  return knownPatterns.some(rx => rx.test(s));
+}
+
+function extractPanelMovementsAndDebug(raw) {
+  if (!raw || !String(raw).trim()) {
+    return {
+      items: [],
+      cleanLines: [],
+      ignoredNoise: [],
+      unknownLines: [],
+      duplicatesRemoved: 0,
+      internalReloadsIgnored: 0
+    };
+  }
+
+  // 1. Quitar envoltorios de links Markdown [texto](https://...) por si se pegó con formato enriquecido
+  let text = String(raw).replace(/\[([^\]]*)\]\(https?:\/\/[^\)]+\)/gi, '$1');
+
+  // 2. Separar si quedaron dos registros pegados en la misma línea
+  text = text.replace(/(\S)\s+([a-z0-9]{3,10}\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}\s+(?:DEPOSITO|DEPÓSITO|RETIRO))/gi, '$1\n$2');
+
+  const rawRecords = [];
+
+  // 3. Extraer todos los bloques de 8 campos (ya sea en 8 renglones por Ctrl+A, en 2 renglones o en 1 renglón con tabs)
+  const recRegex8 = /(?:^|\s)([a-z0-9]{3,10})\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+((?:DEPOSITO|DEPÓSITO|RETIRO)(?:\s*\([^\)]*\))?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)\s+([-\d.,]+)(?=\s|$)/gi;
+
+  let remainder = text.replace(recRegex8, (full, id, fecha, operacionRaw, agente, destino, depStr, retStr, saldoStr) => {
+    rawRecords.push({ id, fecha, operacionRaw, agente, destino, depStr, retStr, saldoStr });
+    return '\n';
+  });
+
+  // 4. Fallback por si alguna fila se copió con 7 campos (sin columna Saldo al final)
+  const recRegex7 = /(?:^|\s)([a-z0-9]{3,10})\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+((?:DEPOSITO|DEPÓSITO|RETIRO)(?:\s*\([^\)]*\))?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)(?=\r?\n|$)/gi;
+
+  remainder = remainder.replace(recRegex7, (full, id, fecha, operacionRaw, agente, destino, depStr, retStr) => {
+    rawRecords.push({ id, fecha, operacionRaw, agente, destino, depStr, retStr, saldoStr: '0' });
+    return '\n';
+  });
+
+  // 5. Clasificar las líneas sobrantes en "Basura conocida de la página" vs "Líneas desconocidas (Debug)"
+  const remLines = remainder.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const ignoredNoise = [];
+  const unknownLines = [];
+
+  remLines.forEach(line => {
+    if (isKnownPanelNoiseLine(line)) {
+      ignoredNoise.push(line);
+    } else {
+      unknownLines.push(line);
+    }
+  });
+
+  // 6. Construir objetos de movimiento, ignorando recargas internas al cajero y deduplicando si pegó 2 veces la misma página
+  const items = [];
+  const cleanLines = [];
+  const seenKeys = new Set();
+  let duplicatesRemoved = 0;
+  let internalReloadsIgnored = 0;
+
+  rawRecords.forEach((rec, idx) => {
+    const dep = Math.abs(parseAmount(rec.depStr));
+    const ret = Math.abs(parseAmount(rec.retStr));
+    const saldo = parseAmount(rec.saldoStr);
+    if (dep <= 0 && ret <= 0) return;
+
+    const isRetiroOp = /RETIRO/i.test(rec.operacionRaw) || (ret > 0 && dep === 0);
+    const tipo = isRetiroOp ? 'RETIRO' : 'DEPOSITO';
+    const monto = tipo === 'RETIRO' ? ret : dep;
+
+    // Ignorar recarga interna de fichas del administrador al cajero (ej: monaco0022 -> naycelu543)
+    if (tipo === 'DEPOSITO' && normalizeUser(rec.destino) === 'naycelu543') {
+      internalReloadsIgnored++;
+      return;
+    }
+
+    // Deduplicar si el usuario pegó varias páginas y se repitió el mismo ID + fecha
+    const dedupKey = `${rec.id.toLowerCase()}_${rec.fecha.trim()}_${monto}`;
+    if (seenKeys.has(dedupKey)) {
+      duplicatesRemoved++;
+      return;
+    }
+    seenKeys.add(dedupKey);
+
+    let playerUser = rec.destino;
+    let agentUser = rec.agente;
+    if (tipo === 'RETIRO' && normalizeUser(rec.destino) === 'naycelu543') {
+      playerUser = rec.agente;
+      agentUser = rec.destino;
+    }
+
+    const dt = parsePanelDateTime(rec.fecha);
+    const fechaDia = extractNormalizedDay(rec.fecha) || 'Sin fecha';
+
+    cleanLines.push(`${rec.id}\t${rec.fecha}\t${rec.operacionRaw}\t${rec.agente}\t${rec.destino}\t${rec.depStr}\t${rec.retStr}\t${rec.saldoStr}`);
+
+    items.push({
+      uid: `P_${idx}_${rec.id}`,
+      id: rec.id,
+      fecha: rec.fecha,
+      fechaDia,
+      timeStr: dt.timeStr,
+      minutesOfDay: dt.minutesOfDay,
+      timestamp: dt.timestamp,
+      operacionRaw: rec.operacionRaw,
+      tipo,
+      agente: agentUser,
+      usuarioOriginal: playerUser,
+      usuarioNorm: normalizeUser(playerUser),
+      deposito: dep,
+      retiro: ret,
+      monto,
+      saldo
+    });
+  });
+
+  return {
+    items,
+    cleanLines,
+    ignoredNoise,
+    unknownLines,
+    duplicatesRemoved,
+    internalReloadsIgnored
+  };
+}
+
+function updatePanelDebugUI(debugInfo, rawText) {
+  AppState.lastPanelDebug = debugInfo;
+  const bar = document.getElementById('panelDebugBar');
+  const summaryText = document.getElementById('panelDebugSummaryText');
+  const box = document.getElementById('panelDebugBox');
+  const statsEl = document.getElementById('panelDebugStats');
+  const unknownWrap = document.getElementById('panelDebugUnknownWrap');
+  const unknownList = document.getElementById('panelDebugUnknownList');
+  const btnDebug = document.getElementById('btnTogglePanelDebug');
+
+  if (!rawText || !String(rawText).trim()) {
+    if (bar) bar.style.display = 'none';
+    if (statsEl) statsEl.textContent = 'Todavía no pegaste datos en el Panel.';
+    if (unknownWrap) unknownWrap.style.display = 'none';
+    if (btnDebug) {
+      btnDebug.textContent = '🛠️ Debug';
+      btnDebug.style.borderColor = '#a78bfa';
+      btnDebug.style.color = '#c4b5fd';
+    }
+    return;
+  }
+
+  const { items, ignoredNoise, unknownLines, duplicatesRemoved, internalReloadsIgnored } = debugInfo;
+
+  if (statsEl) {
+    statsEl.innerHTML = `
+      • <strong style="color:#34d399;">Movimientos útiles detectados:</strong> ${items.length}<br/>
+      • <strong style="color:#38bdf8;">Basura de la página filtrada (menú/totales/pie):</strong> ${ignoredNoise.length} línea(s)<br/>
+      • <strong style="color:#cbd5e1;">Duplicados entre páginas ignorados:</strong> ${duplicatesRemoved} · Recargas internas cajero: ${internalReloadsIgnored}<br/>
+      • <strong style="color:${unknownLines.length > 0 ? '#fbbf24' : '#34d399'};">Líneas/palabras desconocidas:</strong> ${unknownLines.length}
+    `;
+  }
+
+  if (unknownLines.length > 0) {
+    if (bar) {
+      bar.style.display = 'flex';
+      bar.style.background = 'rgba(245, 158, 11, 0.16)';
+      bar.style.border = '1px solid rgba(245, 158, 11, 0.5)';
+      bar.style.color = '#fde68a';
+    }
+    if (summaryText) {
+      summaryText.innerHTML = `⚠️ <strong>Alerta Debug:</strong> Quedaron <strong>${unknownLines.length}</strong> línea(s) o palabra(s) sin reconocer (${items.length} mov. leídos)`;
+    }
+    if (unknownWrap && unknownList) {
+      unknownWrap.style.display = 'block';
+      unknownList.textContent = unknownLines.map((l, i) => `[${i + 1}] ${l}`).join('\n');
+    }
+    if (box) box.style.display = 'block';
+    if (btnDebug) {
+      btnDebug.textContent = `⚠️ Debug (${unknownLines.length})`;
+      btnDebug.style.borderColor = '#f59e0b';
+      btnDebug.style.color = '#fde68a';
+    }
+  } else {
+    if (unknownWrap) unknownWrap.style.display = 'none';
+    if (btnDebug) {
+      btnDebug.textContent = '🛠️ Debug (OK)';
+      btnDebug.style.borderColor = '#34d399';
+      btnDebug.style.color = '#6ee7b7';
+    }
+    if (ignoredNoise.length > 0 || duplicatesRemoved > 0) {
+      if (bar) {
+        bar.style.display = 'flex';
+        bar.style.background = 'rgba(16, 185, 129, 0.12)';
+        bar.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+        bar.style.color = '#6ee7b7';
+      }
+      if (summaryText) {
+        summaryText.innerHTML = `✅ <strong>Limpieza automática OK:</strong> ${items.length} movimientos útiles (${ignoredNoise.length} líneas de página eliminadas${duplicatesRemoved > 0 ? ` · ${duplicatesRemoved} duplicados quitados` : ''})`;
+      }
+    } else if (bar) {
+      bar.style.display = 'none';
+    }
+  }
+}
+
+function togglePanelDebugBox() {
+  const box = document.getElementById('panelDebugBox');
+  if (!box) return;
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+function copyPanelDebugReport() {
+  const dbg = AppState.lastPanelDebug;
+  if (!dbg) {
+    showToast('No hay datos de debug para copiar');
+    return;
+  }
+  const report = [
+    '=== REPORTE DEBUG PANEL ===',
+    `Movimientos leídos: ${dbg.items.length}`,
+    `Líneas de página filtradas: ${dbg.ignoredNoise.length}`,
+    `Duplicados quitados: ${dbg.duplicatesRemoved}`,
+    `Líneas NO reconocidas (${dbg.unknownLines.length}):`,
+    ...(dbg.unknownLines.length > 0 ? dbg.unknownLines : ['(Ninguna - Todo reconocido correctamente)'])
+  ].join('\n');
+
+  navigator.clipboard.writeText(report).then(() => {
+    showToast('📋 Reporte Debug copiado al portapapeles');
+  });
+}
+
+function cleanPanelInputInPlace(showMsg = false) {
+  const panelInput = document.getElementById('panelInput');
+  if (!panelInput || !panelInput.value.trim()) return;
+
+  const res = extractPanelMovementsAndDebug(panelInput.value);
+  if (res.cleanLines.length > 0) {
+    // Si quedó alguna línea desconocida, la conservamos al final para que el Debug la siga mostrando hasta que el usuario decida
+    const extra = res.unknownLines.length > 0 ? '\n' + res.unknownLines.join('\n') : '';
+    panelInput.value = res.cleanLines.join('\n') + extra;
+    parsePanelInput();
+    runComparison();
+    if (showMsg) {
+      showToast(`✨ Texto limpio: quedaron solo los ${res.items.length} movimientos útiles`);
+    }
+  } else if (showMsg) {
+    showToast('⚠️ No se detectaron movimientos válidos para limpiar');
+  }
+}
+
 function parsePanelInput() {
   const panelInput = document.getElementById('panelInput');
   const raw = panelInput ? panelInput.value : '';
-  // Si el usuario pegó dos tandas seguidas sin salto de línea entre ellas, separarlas automáticamente
-  const normalizedRaw = raw.replace(/(\S)\s+([a-z0-9]{4}\t\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})/gi, '$1\n$2');
-  const rawLines = normalizedRaw.split(/\r?\n/);
 
-  const mergedLines = [];
-  for (let i = 0; i < rawLines.length; i++) {
-    const line = rawLines[i].trim();
-    if (!line) continue;
-    if (/^Nro\s+Fecha/i.test(line) || /^TOTALES/i.test(line)) continue;
+  const res = extractPanelMovementsAndDebug(raw);
+  const items = res.items;
 
-    const startsNewRecord = /^[a-z0-9]{3,10}\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i.test(line);
-    if (startsNewRecord || mergedLines.length === 0) {
-      mergedLines.push(line);
-    } else {
-      mergedLines[mergedLines.length - 1] += ' ' + line;
-    }
-  }
-
-  const items = [];
-  mergedLines.forEach((line, idx) => {
-    let parts = line.split('\t').map(s => s.trim()).filter(Boolean);
-    let id, fecha, operacionRaw, agente, destino, dep = 0, ret = 0, saldo = 0;
-    let parsedOk = false;
-
-    if (parts.length >= 6) {
-      id = parts[0];
-      fecha = parts[1];
-      operacionRaw = parts[2];
-      agente = parts[3];
-      destino = parts[4];
-      dep = Math.abs(parseAmount(parts[5]));
-      ret = Math.abs(parseAmount(parts[6]));
-      saldo = parts[7] ? parseAmount(parts[7]) : 0;
-      parsedOk = (dep > 0 || ret > 0);
-    } else {
-      const regex = /^(\S+)\s+(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})\s+(.+?)\s+(\S+)\s+(\S+)\s+([-\d.,]+)\s+([-\d.,]+)(?:\s+([-\d.,]+))?$/;
-      const match = line.match(regex);
-      if (match) {
-        [, id, fecha, operacionRaw, agente, destino, depStr, retStr, saldoStr] = match;
-        dep = Math.abs(parseAmount(depStr));
-        ret = Math.abs(parseAmount(retStr));
-        saldo = parseAmount(saldoStr);
-        parsedOk = (dep > 0 || ret > 0);
-      }
-    }
-
-    if (parsedOk) {
-      const isRetiroOp = /RETIRO/i.test(operacionRaw) || (ret > 0 && dep === 0);
-      const tipo = isRetiroOp ? 'RETIRO' : 'DEPOSITO';
-      const monto = tipo === 'RETIRO' ? ret : dep;
-
-      // En el Panel:
-      // - En DEPOSITO: Agente = naycelu543 (cajero) y Destino = Jugador (salvo recarga de stock monaco0022 -> naycelu543)
-      // - En RETIRO: Agente (parts[3]) = Jugador que retira, y Destino (parts[4]) = naycelu543 (cajero)
-      if (tipo === 'DEPOSITO' && normalizeUser(destino) === 'naycelu543') {
-        // Es una recarga interna de fichas del administrador al cajero (ej: 3.000.000), no un cliente
-        return;
-      }
-
-      let playerUser = destino;
-      let agentUser = agente;
-      if (tipo === 'RETIRO' && normalizeUser(destino) === 'naycelu543') {
-        playerUser = agente;
-        agentUser = destino;
-      }
-
-      const dt = parsePanelDateTime(fecha);
-      const fechaDia = extractNormalizedDay(fecha) || 'Sin fecha';
-
-      items.push({
-        uid: `P_${idx}_${id}`,
-        id,
-        fecha,
-        fechaDia,
-        timeStr: dt.timeStr,
-        minutesOfDay: dt.minutesOfDay,
-        timestamp: dt.timestamp,
-        operacionRaw,
-        tipo,
-        agente: agentUser,
-        usuarioOriginal: playerUser,
-        usuarioNorm: normalizeUser(playerUser),
-        deposito: dep,
-        retiro: ret,
-        monto,
-        saldo
-      });
-    }
-  });
+  updatePanelDebugUI(res, raw);
 
   // Ordenar cronológicamente de 00:00 a 23:59
   items.sort((a, b) => a.timestamp - b.timestamp || a.minutesOfDay - b.minutesOfDay);
@@ -111,6 +298,26 @@ function parsePanelInput() {
   const pill = document.getElementById('pillPanelCount');
   if (pill) pill.textContent = items.length;
 }
+
+// Auto-limpiar en el acto cuando el usuario pega toda la página con Ctrl+V (dejando solo las filas útiles en la caja)
+window.addEventListener('DOMContentLoaded', () => {
+  const panelInput = document.getElementById('panelInput');
+  if (panelInput) {
+    panelInput.addEventListener('paste', () => {
+      setTimeout(() => {
+        const raw = panelInput.value;
+        const res = extractPanelMovementsAndDebug(raw);
+        if (res.items.length > 0 && (res.ignoredNoise.length > 0 || raw.split(/\r?\n/).length > res.items.length * 2)) {
+          const extra = res.unknownLines.length > 0 ? '\n' + res.unknownLines.join('\n') : '';
+          panelInput.value = res.cleanLines.join('\n') + extra;
+          parsePanelInput();
+          updatePanelDebugUI(res, raw); // Mantener el conteo de cuánta basura se acaba de filtrar en el aviso
+          runComparison();
+        }
+      }, 30);
+    });
+  }
+});
 
 // =========================================================
 // CONEXIÓN EN VIVO CON GOOGLE SHEETS
@@ -602,6 +809,20 @@ function onSheetChange() {
 
   AppState.excelItems = combinedParsed;
   populateTimeAndRowSelectors(combinedParsed);
+
+  // Actualizar resumen visual del rango configurado en la cabecera plegable
+  const summaryEl = document.getElementById('quickRangeSummary');
+  if (summaryEl) {
+    if (minSheetIdx === 0 && maxSheetIdx === names.length - 1 && minRowFilter === 1 && maxRowFilter === Infinity && !AppState.timeStartFilter && !AppState.timeEndFilter) {
+      summaryEl.textContent = `Todas las hojas (${names.length})`;
+    } else {
+      const sheetTxt = (startName === endName) ? startName : `${startName} ➔ ${endName}`;
+      const rowTxt = (minRowFilter > 1 || maxRowFilter !== Infinity) ? ` · Filas #${minRowFilter}–#${maxRowFilter === Infinity ? 'Fin' : maxRowFilter}` : '';
+      const timeTxt = (AppState.timeStartFilter || AppState.timeEndFilter) ? ` · ${AppState.timeStartFilter || '00:00'} a ${AppState.timeEndFilter || '23:59'}` : '';
+      summaryEl.textContent = `${sheetTxt}${rowTxt}${timeTxt}`;
+    }
+  }
+
   const badge = document.getElementById('excelCountBadge');
   if (badge) badge.textContent = `${combinedParsed.length} movimiento(s) válido(s)`;
   const pill = document.getElementById('pillExcelCount');

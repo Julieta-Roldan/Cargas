@@ -701,22 +701,25 @@ function renderTable() {
       ? '<span class="type-badge type-retiro">Retiro</span>'
       : '<span class="type-badge type-deposito">Carga</span>';
 
+    const isRetiroRow = row.tipo === 'RETIRO';
+    const userClass = isRetiroRow ? 'user-highlight user-highlight-retiro' : 'user-highlight';
+
     let userDisplay = '';
     if (row.panel && row.excel) {
       if (row.panel.usuarioNorm === row.excel.usuarioNorm) {
-        userDisplay = `<span class="user-highlight">${escapeHtml(row.excel.usuarioOriginal)}</span>`;
+        userDisplay = `<span class="${userClass}">${escapeHtml(row.excel.usuarioOriginal)}</span>`;
       } else {
         userDisplay = `
           <div class="user-pair">
-            <div><span class="user-highlight">${escapeHtml(row.excel.usuarioOriginal)}</span> <span class="user-sub">(Sheets)</span></div>
+            <div><span class="${userClass}">${escapeHtml(row.excel.usuarioOriginal)}</span> <span class="user-sub">(Sheets)</span></div>
             <div class="user-panel-tag">↔ Panel: <span class="mono">${escapeHtml(row.panel.usuarioOriginal)}</span></div>
           </div>
         `;
       }
     } else if (row.panel) {
-      userDisplay = `<span class="user-highlight">${escapeHtml(row.panel.usuarioOriginal)}</span> <span class="user-sub">(Solo Panel)</span>`;
+      userDisplay = `<span class="${userClass}">${escapeHtml(row.panel.usuarioOriginal)}</span> <span class="user-sub">(Solo Panel)</span>`;
     } else {
-      userDisplay = `<span class="user-highlight">${escapeHtml(row.excel.usuarioOriginal)}</span> <span class="user-sub">(Solo Sheets)</span>`;
+      userDisplay = `<span class="${userClass}">${escapeHtml(row.excel.usuarioOriginal)}</span> <span class="user-sub">(Solo Sheets)</span>`;
     }
 
     const montoPanel = row.panel ? formatMoney(row.panel.monto) : '—';
