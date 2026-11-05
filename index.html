@@ -12,19 +12,121 @@
   <!-- Estilos separados -->
   <link rel="stylesheet" href="css/styles.css" />
   <style>
-    /* PANTALLA COMPLETAMENTE NEGRA Y LIMPIA SIN NINGÚN CARTEL NI TEXTO */
+    /* PANTALLA COMPLETAMENTE NEGRA Y LIMPIA (DOBLE CANDADO) */
     #adminAuthOverlay {
       position: fixed;
       inset: 0;
-      background: #0b1120;
+      background: #070c18;
       z-index: 99999;
       display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .auth-box {
+      background: #111827;
+      border: 1.5px solid #1e293b;
+      border-radius: 16px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+      animation: popIn 0.14s ease-out;
+    }
+    .auth-box-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 6px;
+    }
+    .auth-box-sub {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 18px;
+    }
+    .auth-field {
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .auth-field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+    .auth-input-txt {
+      width: 100%;
+      background: #0b1120;
+      border: 1.5px solid #334155;
+      color: #ffffff;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      box-sizing: border-box;
+    }
+    .auth-input-txt:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+    .auth-btn-action {
+      width: 100%;
+      padding: 12px;
+      background: #2563eb;
+      border: none;
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .auth-btn-action:hover {
+      background: #1d4ed8;
+    }
+    .auth-err {
+      color: #f87171;
+      font-size: 0.8rem;
+      margin-top: 10px;
+      display: none;
     }
   </style>
 </head>
 <body>
-  <!-- BLOQUEO CIEGO: Pantalla negra vacía hasta escribir la clave con el teclado -->
-  <div id="adminAuthOverlay"></div>
+  <!-- BLOQUEO CIEGO: Fondo negro. Al tipear +991 aparece el segundo candado (login/registro con Supabase) -->
+  <div id="adminAuthOverlay">
+    <div class="auth-box" id="authBoxContainer" style="display: none;">
+      <div class="auth-box-title" id="authBoxTitle">Iniciar Sesión</div>
+      <div class="auth-box-sub" id="authBoxSub">Ingresá tus credenciales registradas</div>
+
+      <form id="authForm" onsubmit="handleAuthSubmit(event)">
+        <div class="auth-field">
+          <label for="authUserInput">Usuario</label>
+          <input type="text" id="authUserInput" class="auth-input-txt" required autocomplete="username" />
+        </div>
+
+        <div class="auth-field">
+          <label for="authPassInput">Contraseña</label>
+          <input type="password" id="authPassInput" class="auth-input-txt" required autocomplete="current-password" />
+        </div>
+
+        <button type="submit" class="auth-btn-action" id="authSubmitBtn">Entrar</button>
+      </form>
+
+      <div id="authErrMsg" class="auth-err"></div>
+
+      <div style="margin-top: 14px;">
+        <button type="button" onclick="toggleAuthMode()" id="authToggleBtn" style="background: transparent; border: none; color: #38bdf8; font-size: 0.78rem; cursor: pointer; text-decoration: underline;">
+          ¿No tenés usuario? Crealo aquí
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div class="container">
     <!-- ENCABEZADO PRINCIPAL -->
@@ -678,40 +780,160 @@
   <div id="toast" class="toast"></div>
 
   <!-- SCRIPTS MODULARES SEPARADOS -->
+  <script src="js/state.js"></script>
+  <script src="js/supabase-config.js"></script>
   <script>
-    // BLOQUEO CIEGO: Pantalla totalmente negra y silenciosa
-    // Solo se desbloquea al tipear con el teclado: +991 (o 991)
-    const AUTH_SESSION_KEY = 'admin_session_auth_v1';
+    // DOBLE CANDADO:
+    // 1. Candado 1: Pantalla totalmente negra ciega. Se abre tipeando "+991"
+    // 2. Candado 2: Login / Registro contra la tabla 'usuarios' en Supabase
     let blindBuffer = '';
+    let isRegisterMode = false;
 
     function checkAdminAuth() {
-      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const isAuth = sessionStorage.getItem('admin_logged_in_user');
       const overlay = document.getElementById('adminAuthOverlay');
-      if (overlay) {
-        overlay.style.display = isAuth ? 'none' : 'block';
+      const box = document.getElementById('authBoxContainer');
+
+      if (isAuth) {
+        if (overlay) overlay.style.display = 'none';
+      } else {
+        if (overlay) overlay.style.display = 'flex';
+        if (box) box.style.display = 'none'; // Ciego hasta poner +991
       }
     }
 
+    // Escuchar el tipeo secreto de +991
     document.addEventListener('keydown', (e) => {
-      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const isAuth = sessionStorage.getItem('admin_logged_in_user');
       if (isAuth) return;
+
+      const box = document.getElementById('authBoxContainer');
+      const isBoxVisible = box && box.style.display === 'block';
+
+      // Si el formulario ya está visible, no interceptar las teclas para que pueda escribir su contraseña
+      if (isBoxVisible) return;
 
       if (e.key && e.key.length === 1) {
         blindBuffer = (blindBuffer + e.key.toLowerCase()).slice(-4);
-        if (blindBuffer === '+991' || blindBuffer.endsWith('991')) {
+        if (blindBuffer === '+991') {
           blindBuffer = '';
-          sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
-          const overlay = document.getElementById('adminAuthOverlay');
-          if (overlay) overlay.style.display = 'none';
-          showToast('Desbloqueado');
+          box.style.display = 'block';
+          checkIfAnyUserExists();
         }
       }
     });
 
+    async function checkIfAnyUserExists() {
+      const { url, key } = getSupabaseCredentials();
+      try {
+        const res = await fetch(`${url}/rest/v1/usuarios?select=id&limit=1`, {
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+        });
+        const users = await res.json();
+        if (Array.isArray(users) && users.length === 0) {
+          // Si no hay ningún usuario creado, ponerlo en modo "Crear Usuario" de una
+          setRegisterMode(true);
+        } else {
+          setRegisterMode(false);
+        }
+      } catch (err) {
+        setRegisterMode(false);
+      }
+      setTimeout(() => {
+        const u = document.getElementById('authUserInput');
+        if (u) u.focus();
+      }, 50);
+    }
+
+    function toggleAuthMode() {
+      setRegisterMode(!isRegisterMode);
+    }
+
+    function setRegisterMode(register) {
+      isRegisterMode = register;
+      const title = document.getElementById('authBoxTitle');
+      const sub = document.getElementById('authBoxSub');
+      const btn = document.getElementById('authSubmitBtn');
+      const toggle = document.getElementById('authToggleBtn');
+      const errEl = document.getElementById('authErrMsg');
+      if (errEl) errEl.style.display = 'none';
+
+      if (isRegisterMode) {
+        title.textContent = 'Crear Administrador';
+        sub.textContent = 'Creá tu usuario y clave para ingresar siempre';
+        btn.textContent = 'Crear y Entrar';
+        toggle.textContent = '¿Ya tenés cuenta? Iniciar Sesión';
+      } else {
+        title.textContent = 'Iniciar Sesión';
+        sub.textContent = 'Ingresá tus credenciales registradas';
+        btn.textContent = 'Entrar';
+        toggle.textContent = '¿No tenés usuario? Crealo aquí';
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const usuario = document.getElementById('authUserInput').value.trim().toLowerCase();
+      const pass = document.getElementById('authPassInput').value.trim();
+      const errEl = document.getElementById('authErrMsg');
+      const btn = document.getElementById('authSubmitBtn');
+      if (errEl) errEl.style.display = 'none';
+
+      if (!usuario || !pass) return;
+
+      const { url, key } = getSupabaseCredentials();
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+
+      try {
+        if (isRegisterMode) {
+          // Crear usuario en Supabase
+          const res = await fetch(`${url}/rest/v1/usuarios`, {
+            method: 'POST',
+            headers: {
+              'apikey': key,
+              'Authorization': `Bearer ${key}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({ usuario, password: pass })
+          });
+
+          if (!res.ok) {
+            const errTxt = await res.text();
+            throw new Error(errTxt.includes('duplicate') ? 'Ese usuario ya existe' : 'Error al registrar');
+          }
+
+          sessionStorage.setItem('admin_logged_in_user', usuario);
+          document.getElementById('adminAuthOverlay').style.display = 'none';
+          showToast(`Administrador "${usuario}" creado con éxito`);
+        } else {
+          // Iniciar sesión
+          const res = await fetch(`${url}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(usuario)}&password=eq.${encodeURIComponent(pass)}`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+          });
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            sessionStorage.setItem('admin_logged_in_user', usuario);
+            document.getElementById('adminAuthOverlay').style.display = 'none';
+            showToast(`Bienvenido ${usuario}`);
+          } else {
+            throw new Error('Usuario o contraseña incorrectos');
+          }
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = err.message || 'Error de autenticación';
+          errEl.style.display = 'block';
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = isRegisterMode ? 'Crear y Entrar' : 'Entrar';
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', checkAdminAuth);
   </script>
-  <script src="js/state.js"></script>
-  <script src="js/supabase-config.js"></script>
   <script src="js/parsers.js"></script>
   <script src="js/matcher.js"></script>
   <script src="js/ui.js"></script>
