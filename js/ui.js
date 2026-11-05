@@ -89,9 +89,22 @@ function renderDayAndShiftBars() {
         const isActive = activeDay === d;
         let rowRangeText = '';
         if (eItems.length > 0) {
-          const minR = Math.min(...eItems.map(e => e.excelRowNumber));
-          const maxR = Math.max(...eItems.map(e => e.excelRowNumber));
-          rowRangeText = ` · Filas #${minR}–#${maxR}`;
+          const sheetsInDay = [...new Set(eItems.map(e => e.sheetName).filter(Boolean))];
+          if (sheetsInDay.length <= 1) {
+            const minR = Math.min(...eItems.map(e => e.excelRowNumber));
+            const maxR = Math.max(...eItems.map(e => e.excelRowNumber));
+            const prefix = (AppState.currentWorkbook && AppState.currentWorkbook.SheetNames && AppState.currentWorkbook.SheetNames.length > 1 && sheetsInDay[0])
+              ? `${sheetsInDay[0]}: ` : 'Filas ';
+            rowRangeText = ` · ${prefix}#${minR}–#${maxR}`;
+          } else {
+            const parts = sheetsInDay.map(sn => {
+              const sItems = eItems.filter(e => e.sheetName === sn);
+              const minR = Math.min(...sItems.map(e => e.excelRowNumber));
+              const maxR = Math.max(...sItems.map(e => e.excelRowNumber));
+              return `${sn} (#${minR}–#${maxR})`;
+            });
+            rowRangeText = ` · ${parts.join(' + ')}`;
+          }
         }
         btns.push(`
           <button
@@ -422,13 +435,13 @@ function renderComparisonModalContent() {
 
     neighborsHtml = `
       <div class="neighbors-box">
-        <h4>📍 Ubicación exacta en Google Sheets / Excel (Filas cercanas a la Fila #${e.excelRowNumber})</h4>
+        <h4>📍 Ubicación exacta en Google Sheets / Excel (Filas cercanas a ${escapeHtml(formatExcelRowRef(e))})</h4>
         ${slice.map(item => {
           const isCurr = item.uid === e.uid;
           const isItemOk = !!AppState.manualChecks[item.uid];
           return `
             <div class="neighbor-row ${isCurr ? 'current' : ''}">
-              <span class="mono">${isCurr ? '👉 ' : ''}Fila #${item.excelRowNumber}</span>
+              <span class="mono">${isCurr ? '👉 ' : ''}${escapeHtml(formatExcelRowRef(item))}</span>
               <span>${escapeHtml(item.usuarioOriginal)}</span>
               <span class="amount">${formatMoney(item.monto)}</span>
               <span style="font-size: 0.78rem; color: var(--text-muted);">${item.tipo}</span>
@@ -514,7 +527,7 @@ function renderComparisonModalContent() {
       <div class="compare-panel">
         <h3>
           <span>📊 Google Sheets / Excel</span>
-          ${e ? `<span class="mono" style="color: #fbbf24;">Fila #${e.excelRowNumber}</span>` : ''}
+          ${e ? `<span class="mono" style="color: #fbbf24;">${escapeHtml(formatExcelRowRef(e))}</span>` : ''}
         </h3>
         ${e ? `
           <div class="field-row">
@@ -530,8 +543,8 @@ function renderComparisonModalContent() {
             <span class="field-value mono" style="color: #fb923c;">${formatMoney(e.retiro)}</span>
           </div>
           <div class="field-row">
-            <span class="field-label">Número de Fila Excel</span>
-            <span class="field-value mono">Fila #${e.excelRowNumber}</span>
+            <span class="field-label">Hoja y Fila Excel</span>
+            <span class="field-value mono">${escapeHtml(formatExcelRowRef(e))}</span>
           </div>
           <div class="field-row">
             <span class="field-label">Turno Detectado</span>
@@ -613,15 +626,17 @@ function renderTable() {
   filtered.sort((a, b) => {
     if (sortOrder === 'time_asc') {
       return (a.sortMinutes ?? 0) - (b.sortMinutes ?? 0) ||
+             ((a.excel?.sheetIndex ?? 0) - (b.excel?.sheetIndex ?? 0)) ||
              ((a.excel?.excelRowNumber ?? 9999) - (b.excel?.excelRowNumber ?? 9999));
     }
     if (sortOrder === 'time_desc') {
       return (b.sortMinutes ?? 0) - (a.sortMinutes ?? 0) ||
+             ((b.excel?.sheetIndex ?? 0) - (a.excel?.sheetIndex ?? 0)) ||
              ((b.excel?.excelRowNumber ?? 0) - (a.excel?.excelRowNumber ?? 0));
     }
     if (sortOrder === 'excel_row') {
-      const rA = a.excel ? a.excel.excelRowNumber : 99999 + (a.sortMinutes ?? 0);
-      const rB = b.excel ? b.excel.excelRowNumber : 99999 + (b.sortMinutes ?? 0);
+      const rA = a.excel ? (a.excel.sheetIndex || 0) * 100000 + a.excel.excelRowNumber : 9999999 + (a.sortMinutes ?? 0);
+      const rB = b.excel ? (b.excel.sheetIndex || 0) * 100000 + b.excel.excelRowNumber : 9999999 + (b.sortMinutes ?? 0);
       return rA - rB;
     }
     if (sortOrder === 'status') {
@@ -778,7 +793,7 @@ function renderTable() {
               <div class="inline-drop-card">
                 <h5>📊 Datos Completos de Google Sheets / Excel</h5>
                 ${e ? `
-                  <div class="inline-kv"><span>Fila en Google Sheets:</span> <strong class="mono" style="color:#fbbf24;">Fila #${e.excelRowNumber} (${escapeHtml(e.fechaDia || '')} · ${escapeHtml(e.turno || '')})</strong></div>
+                  <div class="inline-kv"><span>Fila en Google Sheets:</span> <strong class="mono" style="color:#fbbf24;">${escapeHtml(formatExcelRowRef(e))} (${escapeHtml(e.fechaDia || '')} · ${escapeHtml(e.turno || '')})</strong></div>
                   <div class="inline-kv"><span>Usuario anotado:</span> <strong class="mono" style="color:#c084fc;">${escapeHtml(e.usuarioOriginal)}</strong></div>
                   <div class="inline-kv"><span>Carga / Retiro:</span> <strong class="mono">${formatMoney(e.carga)} / ${formatMoney(e.retiro)}</strong></div>
                   <div class="inline-kv"><span>Hora en Excel:</span> <strong class="mono">${escapeHtml(e.hora || '—')}</strong></div>
@@ -826,20 +841,29 @@ function copyOkColumn() {
 
 function exportUpdatedExcel() {
   if (AppState.currentWorkbook && (AppState.excelMode === 'file' || AppState.excelMode === 'gsheet')) {
-    const sheetName = document.getElementById('sheetSelect').value || AppState.currentWorkbook.SheetNames[0];
-    const sheet = AppState.currentWorkbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+    const sheetsByName = {};
+    (AppState.currentWorkbook.SheetNames || []).forEach(sn => {
+      const s = AppState.currentWorkbook.Sheets[sn];
+      if (s) {
+        sheetsByName[sn] = XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false });
+      }
+    });
 
     AppState.excelItems.forEach(item => {
+      const sn = item.sheetName || AppState.currentWorkbook.SheetNames[0];
+      const rows = sheetsByName[sn];
+      if (!rows) return;
       const rIdx = item.rowIndex0;
       const cIdx = item.colOkIndex;
       if (!rows[rIdx]) rows[rIdx] = [];
       rows[rIdx][cIdx] = AppState.manualChecks[item.uid] ? 'ok' : '';
     });
 
+    Object.keys(sheetsByName).forEach(sn => {
+      AppState.currentWorkbook.Sheets[sn] = XLSX.utils.aoa_to_sheet(sheetsByName[sn]);
+    });
+
     const missingInExcel = AppState.comparisonResults.filter(r => r.status === 'only_panel');
-    const newSheet = XLSX.utils.aoa_to_sheet(rows);
-    AppState.currentWorkbook.Sheets[sheetName] = newSheet;
 
     if (missingInExcel.length > 0) {
       const missingRows = [

@@ -7,11 +7,20 @@ const DEFAULT_GSHEET_URL = 'https://docs.google.com/spreadsheets/d/1WQ6FCsFy0nG9
 const AppState = {
   currentWorkbook: null,
   currentFileName: 'Control_GoogleSheets.xlsx',
-  excelMode: 'gsheet', // 'gsheet' | 'file' | 'paste'
+  excelMode: 'gsheet', // 'gsheet' | 'file' | 'paste' | 'supabase'
   googleSheetUrl: DEFAULT_GSHEET_URL,
+  googleSheetUrl2: '',
   autoSyncTimer: null,
   lastSyncTime: null,
   currentFilter: 'all',
+
+  sheetStartName: '',    // Hoja inicial seleccionada
+  sheetEndName: '',      // Hoja final seleccionada
+  rowStartFilter: null,  // Fila inicial (null = desde fila 1)
+  rowEndFilter: null,    // Fila final (null = hasta el final)
+  timeStartFilter: '',   // Hora inicial ej "08:00"
+  timeEndFilter: '',     // Hora final ej "16:00"
+  userSetSheetRange: false,
 
   selectedDay: 'auto',   // 'auto' | 'all' | '03/11' | '04/11' ...
   selectedShift: 'all',  // 'all' | nombre del turno
@@ -27,6 +36,16 @@ const AppState = {
   manualChecks: {},  // Mapa de verificaciones manuales (OK)
   isModalOpen: false
 };
+
+// Formatea la referencia de fila incluyendo el nombre de la pestaña si hay varias hojas
+function formatExcelRowRef(e) {
+  if (!e) return '—';
+  const multiSheets = AppState.currentWorkbook && AppState.currentWorkbook.SheetNames && AppState.currentWorkbook.SheetNames.length > 1;
+  if (e.sheetName && multiSheets) {
+    return `${e.sheetName} · Fila #${e.excelRowNumber}`;
+  }
+  return `Fila #${e.excelRowNumber}`;
+}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -115,19 +134,55 @@ function getResolvedActiveDay() {
   return days[days.length - 1];
 }
 
-// Obtiene los movimientos del Panel filtrados por el día activo
-function getActivePanelItems() {
-  const activeDay = getResolvedActiveDay();
-  if (activeDay === 'all') return AppState.panelItems;
-  const matching = AppState.panelItems.filter(p => p.fechaDia === activeDay || p.fechaDia === 'Sin fecha');
-  return matching;
+// Convierte "HH:MM" a minutos del día (0..1439) o null si vacío
+function parseTimeStrToMinutes(tStr) {
+  if (!tStr) return null;
+  const m = String(tStr).trim().match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (isNaN(hh) || isNaN(mm)) return null;
+  return hh * 60 + mm;
 }
 
-// Obtiene los movimientos de Google Sheets/Excel filtrados por el día activo
+function isMinutesWithinRange(mins, minStart, maxEnd) {
+  if (minStart === null && maxEnd === null) return true;
+  if (mins === null || mins === undefined || isNaN(mins)) return true;
+  const s = minStart !== null ? minStart : 0;
+  const e = maxEnd !== null ? maxEnd : 1439;
+  if (s <= e) {
+    return mins >= s && mins <= e;
+  } else {
+    // Rango nocturno que cruza medianoche (ej: 22:00 a 06:00)
+    return mins >= s || mins <= e;
+  }
+}
+
+// Obtiene los movimientos del Panel filtrados por el día activo y horario
+function getActivePanelItems() {
+  const activeDay = getResolvedActiveDay();
+  const minT = parseTimeStrToMinutes(AppState.timeStartFilter);
+  const maxT = parseTimeStrToMinutes(AppState.timeEndFilter);
+  const base = activeDay === 'all'
+    ? AppState.panelItems
+    : AppState.panelItems.filter(p => p.fechaDia === activeDay || p.fechaDia === 'Sin fecha');
+  if (minT === null && maxT === null) return base;
+  return base.filter(p => isMinutesWithinRange(p.minutesOfDay, minT, maxT));
+}
+
+// Obtiene los movimientos de Google Sheets/Excel filtrados por el día activo y horario
 function getActiveExcelItems() {
   const activeDay = getResolvedActiveDay();
-  if (activeDay === 'all') return AppState.excelItems;
-  return AppState.excelItems.filter(e => e.fechaDia === activeDay || e.fechaDia === 'Sin fecha');
+  const minT = parseTimeStrToMinutes(AppState.timeStartFilter);
+  const maxT = parseTimeStrToMinutes(AppState.timeEndFilter);
+  const base = activeDay === 'all'
+    ? AppState.excelItems
+    : AppState.excelItems.filter(e => e.fechaDia === activeDay || e.fechaDia === 'Sin fecha');
+  if (minT === null && maxT === null) return base;
+  return base.filter(e => {
+    const mins = e.hora ? parseTimeStrToMinutes(e.hora) : null;
+    return isMinutesWithinRange(mins, minT, maxT);
+  });
 }
 
 function formatMoney(num) {

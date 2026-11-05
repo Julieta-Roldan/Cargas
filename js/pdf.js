@@ -344,7 +344,7 @@ function generatePdfDocument() {
     } else {
       const bodyRows = rowsBadNames.map((r, i) => [
         i + 1,
-        `Fila #${r.excel.excelRowNumber}`,
+        formatExcelRowRef(r.excel),
         r.panel.timeStr || r.excel.hora || '—',
         r.excel.usuarioOriginal,
         r.panel.usuarioOriginal,
@@ -392,7 +392,7 @@ function generatePdfDocument() {
         const diff = r.panel.monto - r.excel.monto;
         return [
           i + 1,
-          `Fila #${r.excel.excelRowNumber}`,
+          formatExcelRowRef(r.excel),
           r.panel.timeStr || '—',
           r.excel.usuarioOriginal,
           formatMoney(r.panel.monto),
@@ -440,7 +440,7 @@ function generatePdfDocument() {
       const totalExtraExcel = rowsOnlyExcel.reduce((acc, r) => acc + (r.excel ? r.excel.monto : 0), 0);
       const bodyRows = rowsOnlyExcel.map((r, i) => [
         i + 1,
-        `Fila #${r.excel.excelRowNumber}`,
+        formatExcelRowRef(r.excel),
         r.tipo === 'RETIRO' ? 'Retiro' : 'Carga',
         r.excel.usuarioOriginal,
         formatMoney(r.excel.monto),
@@ -493,7 +493,7 @@ function generatePdfDocument() {
 
     const bodyRows = rowsSumCharges.map((r, i) => [
       i + 1,
-      `Fila #${r.excel.excelRowNumber}`,
+      formatExcelRowRef(r.excel),
       r.panel.timeStr || '—',
       `${r.excel.usuarioOriginal} (${r.panel.usuarioOriginal})`,
       r.panel.combinedParts,
@@ -525,7 +525,7 @@ function generatePdfDocument() {
     if (rowsMatched.length > 0) {
       const bodyRows = rowsMatched.map((r, i) => [
         i + 1,
-        `Fila #${r.excel.excelRowNumber}`,
+        formatExcelRowRef(r.excel),
         r.panel.timeStr || '—',
         r.tipo === 'RETIRO' ? 'Retiro' : 'Carga',
         r.excel.usuarioOriginal,

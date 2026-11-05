@@ -121,10 +121,28 @@ function extractGoogleSheetId(url) {
   return m ? m[1] : null;
 }
 
+function toggleSecondGsheetUrl() {
+  const box = document.getElementById('secondGsheetUrlBox');
+  if (!box) return;
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+function clearSecondGsheetUrl() {
+  const inp = document.getElementById('gsheetUrlInput2');
+  if (inp) inp.value = '';
+  const box = document.getElementById('secondGsheetUrlBox');
+  if (box) box.style.display = 'none';
+  syncGoogleSheet(false);
+}
+
 async function syncGoogleSheet(silent = false) {
   const urlInput = document.getElementById('gsheetUrlInput');
   const url = urlInput ? urlInput.value.trim() : AppState.googleSheetUrl;
   AppState.googleSheetUrl = url;
+
+  const urlInput2 = document.getElementById('gsheetUrlInput2');
+  const url2 = urlInput2 ? urlInput2.value.trim() : '';
+  AppState.googleSheetUrl2 = url2;
 
   const sheetId = extractGoogleSheetId(url);
   if (!sheetId) {
@@ -151,7 +169,32 @@ async function syncGoogleSheet(silent = false) {
     }
     const arrayBuffer = await response.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
-    AppState.currentWorkbook = XLSX.read(data, { type: 'array' });
+    const mainWb = XLSX.read(data, { type: 'array' });
+
+    // Si hay un 2do enlace de Google Sheets configurado, descargarlo y anexar sus hojas
+    const sheetId2 = extractGoogleSheetId(url2);
+    if (sheetId2 && sheetId2 !== sheetId) {
+      try {
+        const exportUrl2 = `https://docs.google.com/spreadsheets/d/${sheetId2}/export?format=xlsx&t=${Date.now()}`;
+        const res2 = await fetch(exportUrl2);
+        if (res2.ok) {
+          const ab2 = await res2.arrayBuffer();
+          const wb2 = XLSX.read(new Uint8Array(ab2), { type: 'array' });
+          wb2.SheetNames.forEach(sName => {
+            let targetName = `Link2 · ${sName}`;
+            if (mainWb.SheetNames.includes(targetName)) {
+              targetName = `Link2_${Date.now()} · ${sName}`;
+            }
+            mainWb.SheetNames.push(targetName);
+            mainWb.Sheets[targetName] = wb2.Sheets[sName];
+          });
+        }
+      } catch (e2) {
+        console.warn('No se pudo cargar el 2do link de Google Sheets:', e2);
+      }
+    }
+
+    AppState.currentWorkbook = mainWb;
     AppState.currentFileName = 'Control_GoogleSheets.xlsx';
 
     populateSheetSelector();
@@ -161,11 +204,12 @@ async function syncGoogleSheet(silent = false) {
     const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     AppState.lastSyncTime = timeStr;
 
+    const totalSheets = mainWb.SheetNames.length;
     if (statusEl) {
-      statusEl.innerHTML = `🟢 Conectado en vivo · Última actualización: <strong>${timeStr}</strong> (${AppState.excelItems.length} movimientos)`;
+      statusEl.innerHTML = `🟢 Conectado en vivo (${totalSheets} hoja${totalSheets > 1 ? 's' : ''}) · Actualizado: <strong>${timeStr}</strong> (${AppState.excelItems.length} mov.)`;
     }
     if (!silent) {
-      showToast(`🔄 Google Sheets sincronizado (${AppState.excelItems.length} movimientos)`);
+      showToast(`🔄 Google Sheets sincronizado (${AppState.excelItems.length} movimientos en ${totalSheets} hoja${totalSheets > 1 ? 's' : ''})`);
     }
   } catch (err) {
     // Fallback automático por JSONP si se abre desde un entorno sin CORS para fetch
@@ -201,8 +245,7 @@ function syncGoogleSheetViaJsonp(sheetId, silent) {
     AppState.currentFileName = 'Control_GoogleSheets.xlsx';
 
     populateSheetSelector();
-    parseExcelRowsArray(rows);
-    runComparison();
+    onSheetChange();
 
     const timeStr = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     if (statusEl) {
@@ -245,30 +288,228 @@ function openGoogleSheetInTab() {
   if (url) window.open(url, '_blank');
 }
 
-function populateSheetSelector() {
-  if (!AppState.currentWorkbook) return;
-  const sheetSelect = document.getElementById('sheetSelect');
-  if (!sheetSelect) return;
-  const prevVal = sheetSelect.value;
-  sheetSelect.innerHTML = '';
-  AppState.currentWorkbook.SheetNames.forEach((name) => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    sheetSelect.appendChild(opt);
+function populateTimeAndRowSelectors(items = []) {
+  const tStart = document.getElementById('timeStartSelect');
+  const tEnd = document.getElementById('timeEndSelect');
+  const rowList = document.getElementById('excelRowSuggestions');
+
+  // Construir lista de horarios cada 30 min + horarios exactos presentes en la planilla
+  const timeSet = new Set();
+  for (let h = 0; h < 24; h++) {
+    const hh = String(h).padStart(2, '0');
+    timeSet.add(`${hh}:00`);
+    timeSet.add(`${hh}:30`);
+  }
+  timeSet.add('23:59');
+
+  items.forEach(it => {
+    if (it.hora && /^\d{1,2}:\d{2}$/.test(it.hora.trim())) {
+      const parts = it.hora.trim().split(':');
+      timeSet.add(`${ parts[0].padStart(2, '0') }:${ parts[1] }`);
+    }
   });
-  if (prevVal && AppState.currentWorkbook.SheetNames.includes(prevVal)) {
-    sheetSelect.value = prevVal;
+
+  const sortedTimes = Array.from(timeSet).sort();
+
+  if (tStart) {
+    const prevS = AppState.timeStartFilter || tStart.value || '';
+    tStart.innerHTML = `<option value="">00:00 (Inicio)</option>` +
+      sortedTimes.map(t => `<option value="${t}">${t} hs</option>`).join('');
+    tStart.value = prevS;
   }
 
-  document.getElementById('fileNameLabel').textContent = AppState.currentFileName;
-  document.getElementById('excelMetaBar').style.display = 'flex';
-  document.getElementById('sheetSelectorWrap').style.display =
-    AppState.currentWorkbook.SheetNames.length > 1 ? 'inline-block' : 'none';
+  if (tEnd) {
+    const prevE = AppState.timeEndFilter || tEnd.value || '';
+    tEnd.innerHTML = `<option value="">23:59 (Final)</option>` +
+      sortedTimes.map(t => `<option value="${t}">${t} hs</option>`).join('');
+    tEnd.value = prevE;
+  }
+
+  if (rowList) {
+    const rowOpts = [];
+    const seenRows = new Set();
+    const addRowOpt = (num, label) => {
+      if (!num || seenRows.has(num)) return;
+      seenRows.add(num);
+      rowOpts.push(`<option value="${num}">${escapeHtml(label)}</option>`);
+    };
+
+    addRowOpt(1, 'Fila #1 (Inicio de hoja)');
+    // Agregar filas donde empieza cada día o turno
+    let lastShiftKey = '';
+    items.forEach(it => {
+      const key = `${it.sheetName || ''} - ${it.fechaDia || ''} · ${it.turno || ''}`;
+      if (key !== lastShiftKey && it.excelRowNumber) {
+        lastShiftKey = key;
+        addRowOpt(it.excelRowNumber, `Fila #${it.excelRowNumber} (${key})`);
+      }
+    });
+
+    // Agregar saltos cada 100 filas como guía rápida
+    [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].forEach(n => {
+      addRowOpt(n, `Fila #${n}`);
+    });
+
+    if (items.length > 0) {
+      const lastIt = items[items.length - 1];
+      addRowOpt(lastIt.excelRowNumber, `Fila #${lastIt.excelRowNumber} (Última con datos)`);
+    }
+
+    rowList.innerHTML = rowOpts.join('');
+  }
+}
+
+function populateSheetSelector() {
+  populateTimeAndRowSelectors(AppState.excelItems || []);
+  if (!AppState.currentWorkbook) return;
+  const names = AppState.currentWorkbook.SheetNames || [];
+  if (names.length === 0) return;
+
+  const wrap = document.getElementById('sheetSelectorWrap');
+  if (wrap) wrap.style.display = 'none';
+
+  const sheetSelect = document.getElementById('sheetSelect');
+  const startSel = document.getElementById('sheetStartSelect');
+  const endSel = document.getElementById('sheetEndSelect');
+
+  if (sheetSelect) {
+    const prevVal = sheetSelect.value;
+    sheetSelect.innerHTML = '';
+    names.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sheetSelect.appendChild(opt);
+    });
+    if (prevVal && names.includes(prevVal)) sheetSelect.value = prevVal;
+  }
+
+  if (startSel && endSel) {
+    const prevStart = AppState.sheetStartName || startSel.value;
+    const prevEnd = AppState.sheetEndName || endSel.value;
+
+    startSel.innerHTML = '';
+    endSel.innerHTML = '';
+    names.forEach((name, idx) => {
+      const sheetObj = AppState.currentWorkbook.Sheets[name];
+      const rowsArr = sheetObj ? XLSX.utils.sheet_to_json(sheetObj, { header: 1, defval: '', raw: false }) : [];
+      const rowCountLabel = rowsArr.length > 0 ? ` (${rowsArr.length} filas)` : '';
+
+      const o1 = document.createElement('option');
+      o1.value = name;
+      o1.textContent = `${idx + 1}. ${name}${rowCountLabel}`;
+      startSel.appendChild(o1);
+
+      const o2 = document.createElement('option');
+      o2.value = name;
+      o2.textContent = `${idx + 1}. ${name}${rowCountLabel}`;
+      endSel.appendChild(o2);
+    });
+
+    if (AppState.userSetSheetRange && prevStart && names.includes(prevStart) && prevEnd && names.includes(prevEnd)) {
+      startSel.value = prevStart;
+      endSel.value = prevEnd;
+    } else {
+      // Por defecto: seleccionar desde la primera hoja hasta la última hoja para unir todas las hojas
+      startSel.value = names[0];
+      endSel.value = names[names.length - 1];
+      AppState.sheetStartName = names[0];
+      AppState.sheetEndName = names[names.length - 1];
+    }
+  }
+
+  renderQuickSheetButtons();
+
+  const fileLabel = document.getElementById('fileNameLabel');
+  if (fileLabel) fileLabel.textContent = AppState.currentFileName;
+  const metaBar = document.getElementById('excelMetaBar');
+  if (metaBar) metaBar.style.display = 'flex';
+}
+
+function renderQuickSheetButtons() {
+  const wrap = document.getElementById('quickSheetButtons');
+  if (!wrap || !AppState.currentWorkbook) return;
+  const names = AppState.currentWorkbook.SheetNames || [];
+  if (names.length <= 1) {
+    wrap.innerHTML = `<span class="mini-pill">1 pestaña (${escapeHtml(names[0] || 'Hoja 1')})</span>`;
+    return;
+  }
+
+  const startSel = document.getElementById('sheetStartSelect');
+  const endSel = document.getElementById('sheetEndSelect');
+  const currStart = startSel ? startSel.value : names[0];
+  const currEnd = endSel ? endSel.value : names[names.length - 1];
+  const isAllSelected = (currStart === names[0] && currEnd === names[names.length - 1]);
+
+  const btns = [];
+  btns.push(`
+    <button
+      type="button"
+      class="tab-btn ${isAllSelected ? 'active' : ''}"
+      onclick="selectQuickSheetRange('${escapeHtml(names[0])}', '${escapeHtml(names[names.length - 1])}', true)"
+      style="padding: 3px 9px; font-size: 0.74rem;"
+      title="Leer y unir todas las pestañas de la planilla al mismo tiempo"
+    >
+      📚 Todas las Hojas (${names.length})
+    </button>
+  `);
+
+  names.forEach(n => {
+    const isSingle = (currStart === n && currEnd === n);
+    btns.push(`
+      <button
+        type="button"
+        class="tab-btn ${isSingle ? 'active' : ''}"
+        onclick="selectQuickSheetRange('${escapeHtml(n)}', '${escapeHtml(n)}', false)"
+        style="padding: 3px 9px; font-size: 0.74rem;"
+        title="Leer únicamente la pestaña ${escapeHtml(n)}"
+      >
+        📄 Solo ${escapeHtml(n)}
+      </button>
+    `);
+  });
+
+  wrap.innerHTML = btns.join('');
+}
+
+function selectQuickSheetRange(startName, endName, isAll) {
+  const startSel = document.getElementById('sheetStartSelect');
+  const endSel = document.getElementById('sheetEndSelect');
+  if (startSel) startSel.value = startName;
+  if (endSel) endSel.value = endName;
+  AppState.sheetStartName = startName;
+  AppState.sheetEndName = endName;
+  AppState.userSetSheetRange = true;
+  onRangeOrSheetChange();
+  showToast(isAll ? '📚 Usando todas las hojas unificadas' : `📄 Filtrado solo a: ${startName}`);
+}
+
+function resetSheetAndRowRange() {
+  if (!AppState.currentWorkbook) return;
+  const names = AppState.currentWorkbook.SheetNames || [];
+  const startSel = document.getElementById('sheetStartSelect');
+  const endSel = document.getElementById('sheetEndSelect');
+  const rStart = document.getElementById('rowStartInput');
+  const rEnd = document.getElementById('rowEndInput');
+  const tStart = document.getElementById('timeStartSelect');
+  const tEnd = document.getElementById('timeEndSelect');
+
+  if (startSel && names.length > 0) startSel.value = names[0];
+  if (endSel && names.length > 0) endSel.value = names[names.length - 1];
+  if (rStart) rStart.value = '';
+  if (rEnd) rEnd.value = '';
+  if (tStart) tStart.value = '';
+  if (tEnd) tEnd.value = '';
+
+  AppState.timeStartFilter = '';
+  AppState.timeEndFilter = '';
+  AppState.userSetSheetRange = false;
+  onRangeOrSheetChange();
+  showToast('🔄 Rango restablecido: leyendo todas las hojas, filas y horarios');
 }
 
 // =========================================================
-// PARSER DE ARCHIVO EXCEL LOCAL (.xlsx / .csv) Y PEGADO
+// PARSER DE ARCHIVO EXCEL LOCAL (.xlsx / .csv) Y RANGOS
 // =========================================================
 function handleExcelFile(file) {
   AppState.currentFileName = file.name;
@@ -278,6 +519,7 @@ function handleExcelFile(file) {
   reader.onload = function(e) {
     const data = new Uint8Array(e.target.result);
     AppState.currentWorkbook = XLSX.read(data, { type: 'array' });
+    AppState.userSetSheetRange = false;
     populateSheetSelector();
     onSheetChange();
     showToast(`📊 Excel "${file.name}" cargado correctamente`);
@@ -285,15 +527,86 @@ function handleExcelFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
+function onRangeOrSheetChange() {
+  AppState.userSetSheetRange = true;
+  onSheetChange();
+}
+
 function onSheetChange() {
   if (!AppState.currentWorkbook) return;
-  const sheetSelect = document.getElementById('sheetSelect');
-  const sheetName = (sheetSelect && sheetSelect.value) ? sheetSelect.value : AppState.currentWorkbook.SheetNames[0];
-  const sheet = AppState.currentWorkbook.Sheets[sheetName];
-  // IMPORTANTE: raw: false devuelve el texto formateado tal cual se ve en Google Sheets/Excel
-  // Así "03/11" se lee como "03/11" (y no como el serial de fecha 46329) y "15:23" como "15:23"
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
-  parseExcelRowsArray(rows);
+  const names = AppState.currentWorkbook.SheetNames || [];
+  if (names.length === 0) return;
+
+  const startSel = document.getElementById('sheetStartSelect');
+  const endSel = document.getElementById('sheetEndSelect');
+  const rStartEl = document.getElementById('rowStartInput');
+  const rEndEl = document.getElementById('rowEndInput');
+  const tStartEl = document.getElementById('timeStartSelect');
+  const tEndEl = document.getElementById('timeEndSelect');
+
+  const startName = (startSel && startSel.value) ? startSel.value : names[0];
+  const endName = (endSel && endSel.value) ? endSel.value : names[names.length - 1];
+
+  AppState.sheetStartName = startName;
+  AppState.sheetEndName = endName;
+  AppState.timeStartFilter = tStartEl ? tStartEl.value : '';
+  AppState.timeEndFilter = tEndEl ? tEndEl.value : '';
+
+  const rawStartRow = rStartEl && rStartEl.value ? parseInt(rStartEl.value, 10) : null;
+  const rawEndRow = rEndEl && rEndEl.value ? parseInt(rEndEl.value, 10) : null;
+
+  const minRowFilter = (rawStartRow && !isNaN(rawStartRow) && rawStartRow >= 1) ? rawStartRow : 1;
+  const maxRowFilter = (rawEndRow && !isNaN(rawEndRow) && rawEndRow >= 1) ? rawEndRow : Infinity;
+
+  AppState.rowStartFilter = minRowFilter > 1 ? minRowFilter : null;
+  AppState.rowEndFilter = maxRowFilter !== Infinity ? maxRowFilter : null;
+
+  renderQuickSheetButtons();
+
+  const idxA = Math.max(0, names.indexOf(startName));
+  const idxB = Math.max(0, names.indexOf(endName));
+  const minSheetIdx = Math.min(idxA, idxB);
+  const maxSheetIdx = Math.max(idxA, idxB);
+
+  const combinedParsed = [];
+  let carryDate = 'Sin fecha';
+  let carryShift = 'Turno Inicial';
+
+  // Recorremos desde la primera hoja hasta maxSheetIdx para conservar la continuidad de Fecha y Turno
+  for (let sIdx = 0; sIdx <= maxSheetIdx; sIdx++) {
+    const sName = names[sIdx];
+    const sheet = AppState.currentWorkbook.Sheets[sName];
+    if (!sheet) continue;
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+
+    const includeSheet = (sIdx >= minSheetIdx && sIdx <= maxSheetIdx);
+    const sheetMinRow = (sIdx === minSheetIdx) ? minRowFilter : 1;
+    const sheetMaxRow = (sIdx === maxSheetIdx) ? maxRowFilter : Infinity;
+
+    const res = extractItemsFromSheetRows(rows, {
+      sheetName: sName,
+      sheetIndex: sIdx,
+      initialDate: carryDate,
+      initialShift: carryShift,
+      includeInOutput: includeSheet,
+      minRowNum: sheetMinRow,
+      maxRowNum: sheetMaxRow
+    });
+
+    carryDate = res.lastDate;
+    carryShift = res.lastShift;
+    if (includeSheet && res.items.length > 0) {
+      combinedParsed.push(...res.items);
+    }
+  }
+
+  AppState.excelItems = combinedParsed;
+  populateTimeAndRowSelectors(combinedParsed);
+  const badge = document.getElementById('excelCountBadge');
+  if (badge) badge.textContent = `${combinedParsed.length} movimiento(s) válido(s)`;
+  const pill = document.getElementById('pillExcelCount');
+  if (pill) pill.textContent = combinedParsed.length;
+
   runComparison();
 }
 
@@ -310,6 +623,36 @@ function parseExcelRowsArray(rows) {
     document.getElementById('excelCountBadge').textContent = '0 registros';
     document.getElementById('pillExcelCount').textContent = '0';
     return;
+  }
+
+  const res = extractItemsFromSheetRows(rows, {
+    sheetName: 'Hoja 1',
+    sheetIndex: 0,
+    initialDate: 'Sin fecha',
+    initialShift: 'Turno Inicial',
+    includeInOutput: true,
+    minRowNum: 1,
+    maxRowNum: Infinity
+  });
+
+  AppState.excelItems = res.items;
+  const badge = document.getElementById('excelCountBadge');
+  if (badge) badge.textContent = `${res.items.length} movimiento(s) válido(s)`;
+  const pill = document.getElementById('pillExcelCount');
+  if (pill) pill.textContent = res.items.length;
+}
+
+function extractItemsFromSheetRows(rows, opts = {}) {
+  const sheetName = opts.sheetName || 'Hoja 1';
+  const sheetIndex = opts.sheetIndex || 0;
+  let currentDate = opts.initialDate || 'Sin fecha';
+  let currentShift = opts.initialShift || 'Turno Inicial';
+  const includeInOutput = opts.includeInOutput !== false;
+  const minRowNum = opts.minRowNum || 1;
+  const maxRowNum = opts.maxRowNum || Infinity;
+
+  if (!rows || rows.length === 0) {
+    return { items: [], lastDate: currentDate, lastShift: currentShift };
   }
 
   let colUsuario = 0;
@@ -341,25 +684,28 @@ function parseExcelRowsArray(rows) {
     }
   }
 
-  const parsed = [];
-  let currentDate = 'Sin fecha';
-  let currentShift = 'Turno Inicial';
-
-  // Pre-escanear si hay una primera fecha en los separadores iniciales por si hay filas antes del primer separador
-  for (let r = startRow; r < Math.min(startRow + 25, rows.length); r++) {
-    const row = rows[r];
-    if (!row) continue;
-    for (let c = 0; c < 4; c++) {
-      const d = extractNormalizedDay(row[c]);
-      if (d) {
-        currentDate = d;
-        break;
+  // Si aún no venía fecha arrastrada de una hoja anterior, pre-escanear las primeras 25 filas
+  if (currentDate === 'Sin fecha') {
+    for (let r = startRow; r < Math.min(startRow + 25, rows.length); r++) {
+      const row = rows[r];
+      if (!row) continue;
+      for (let c = 0; c < 4; c++) {
+        const d = extractNormalizedDay(row[c]);
+        if (d) {
+          currentDate = d;
+          break;
+        }
       }
+      if (currentDate !== 'Sin fecha') break;
     }
-    if (currentDate !== 'Sin fecha') break;
   }
 
+  const parsed = [];
+
   for (let r = startRow; r < rows.length; r++) {
+    const excelRowNumber = r + 1;
+    if (excelRowNumber > maxRowNum) break;
+
     const row = rows[r];
     if (!row || row.length === 0) continue;
 
@@ -376,7 +722,6 @@ function parseExcelRowsArray(rows) {
     const retiro = Math.abs(parseAmount(rawRetiro));
 
     // Si no tiene monto válido de Carga ni de Retiro, es una fila separadora de Fecha o Turno
-    // Ejemplos: "03/11 | PRI | Y | Nayla", "Erika y Pri TM | 03/11", "Agus y lud tt", "NAY PRI", "04/11 | TN"
     if (carga <= 0 && retiro <= 0) {
       const cells = [rawUser, rawCarga, rawRetiro, rawHora].map(x => String(x ?? '').trim()).filter(Boolean);
       for (const cellText of cells) {
@@ -393,18 +738,19 @@ function parseExcelRowsArray(rows) {
 
     if (!rawUser) continue;
 
+    // Si la fila está antes del inicio solicitado o la hoja solo se escaneó por continuidad de fecha/turno, no agregar
+    if (!includeInOutput || excelRowNumber < minRowNum) continue;
+
     const tipo = retiro > 0 && carga === 0 ? 'RETIRO' : 'DEPOSITO';
     const monto = tipo === 'RETIRO' ? retiro : carga;
-    const excelRowNumber = r + 1;
 
-    // Si el trabajador escribió la hora en la columna Retiro en una fila de Carga (ej: "23:03"), rescatarla
     let timeCellVal = rawHora;
     if ((!timeCellVal || String(timeCellVal).trim() === '') && tipo === 'DEPOSITO' && rawRetiro && String(rawRetiro).includes(':')) {
       timeCellVal = rawRetiro;
     }
     const formattedTime = formatExcelTime(timeCellVal);
 
-    const uid = `E_row_${excelRowNumber}_${normalizeUser(rawUser)}_${monto}`;
+    const uid = `E_${sheetName}_row_${excelRowNumber}_${normalizeUser(rawUser)}_${monto}`;
     if (['ok', 'si', 'sí', '✓', '1', 'x'].includes(rawOk.toLowerCase())) {
       if (AppState.manualChecks[uid] === undefined) {
         AppState.manualChecks[uid] = true;
@@ -413,6 +759,8 @@ function parseExcelRowsArray(rows) {
 
     parsed.push({
       uid,
+      sheetName,
+      sheetIndex,
       excelRowNumber,
       rowIndex0: r,
       colOkIndex: colOk,
@@ -431,11 +779,7 @@ function parseExcelRowsArray(rows) {
     });
   }
 
-  AppState.excelItems = parsed;
-  const badge = document.getElementById('excelCountBadge');
-  if (badge) badge.textContent = `${parsed.length} movimiento(s) válido(s)`;
-  const pill = document.getElementById('pillExcelCount');
-  if (pill) pill.textContent = parsed.length;
+  return { items: parsed, lastDate: currentDate, lastShift: currentShift };
 }
 
 // =========================================================

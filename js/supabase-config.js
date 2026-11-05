@@ -44,12 +44,16 @@ function getCurrentDateAndTime() {
 // OPERACIONES CRUD (SUPABASE REST API + FALLBACK LOCAL)
 // =========================================================
 
-// 1. Obtener movimientos (opcionalmente filtrados por fecha_dia)
-async function fetchMovimientosFromDB(fechaDiaFilter = null) {
+// 1. Obtener movimientos (opcionalmente filtrados por fecha_dia y estado de borrado)
+async function fetchMovimientosFromDB(fechaDiaFilter = null, includeDeleted = false) {
   const { url, key, isConfigured } = getSupabaseCredentials();
 
   if (isConfigured) {
-    let endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.asc`;
+    let endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.desc`;
+    if (!includeDeleted) {
+      // Por defecto solo traer los no borrados (o donde borrado sea null/false)
+      endpoint += `&or=(borrado.is.null,borrado.eq.false)`;
+    }
     if (fechaDiaFilter && fechaDiaFilter !== 'all') {
       endpoint += `&fecha_dia=eq.${encodeURIComponent(fechaDiaFilter)}`;
     }
@@ -76,6 +80,9 @@ async function fetchMovimientosFromDB(fechaDiaFilter = null) {
   } catch (e) {
     list = [];
   }
+  if (!includeDeleted) {
+    list = list.filter(item => !item.borrado);
+  }
   if (fechaDiaFilter && fechaDiaFilter !== 'all') {
     list = list.filter(item => item.fecha_dia === fechaDiaFilter);
   }
@@ -95,7 +102,9 @@ async function insertMovimientoInDB(payload) {
     hora: payload.hora || dt.hora,
     fecha_dia: payload.fecha_dia || dt.fechaDia,
     turno: String(payload.turno || 'Turno Actual').trim(),
-    verificado: false
+    verificado: false,
+    borrado: false,
+    editado_hora: ''
   };
 
   if (isConfigured) {
@@ -131,9 +140,15 @@ async function insertMovimientoInDB(payload) {
   return { source: 'local', item: localItem };
 }
 
-// 3. Editar un movimiento existente por ID
+// 3. Editar un movimiento existente por ID (registra editado_hora)
 async function updateMovimientoInDB(id, changes) {
   const { url, key, isConfigured } = getSupabaseCredentials();
+  const dt = getCurrentDateAndTime();
+
+  const finalChanges = {
+    ...changes,
+    editado_hora: `${dt.hora} (${dt.fechaDia})`
+  };
 
   if (isConfigured) {
     const endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}`;
@@ -145,7 +160,7 @@ async function updateMovimientoInDB(id, changes) {
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
-      body: JSON.stringify(changes)
+      body: JSON.stringify(finalChanges)
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -160,38 +175,28 @@ async function updateMovimientoInDB(id, changes) {
   const list = raw ? JSON.parse(raw) : [];
   const idx = list.findIndex(x => String(x.id) === String(id));
   if (idx !== -1) {
-    list[idx] = { ...list[idx], ...changes };
+    list[idx] = { ...list[idx], ...finalChanges };
     localStorage.setItem(LOCAL_STORAGE_MOVS_KEY, JSON.stringify(list));
     return { source: 'local', item: list[idx] };
   }
   throw new Error('Registro no encontrado');
 }
 
-// 4. Eliminar un movimiento por ID
-async function deleteMovimientoFromDB(id) {
-  const { url, key, isConfigured } = getSupabaseCredentials();
+// 4. Mandar a Papelera (soft delete: borrado = true)
+async function softDeleteMovimientoInDB(id) {
+  const dt = getCurrentDateAndTime();
+  return updateMovimientoInDB(id, {
+    borrado: true,
+    editado_hora: `Borrado a las ${dt.hora} (${dt.fechaDia})`
+  });
+}
 
-  if (isConfigured) {
-    const endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}`;
-    const res = await fetch(endpoint, {
-      method: 'DELETE',
-      headers: {
-        'apikey': key,
-        'Authorization': `Bearer ${key}`
-      }
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`No se pudo eliminar en Supabase: ${errText}`);
-    }
-    return { source: 'supabase', ok: true };
-  }
-
-  // Fallback Local
-  const raw = localStorage.getItem(LOCAL_STORAGE_MOVS_KEY);
-  const list = raw ? JSON.parse(raw) : [];
-  const filtered = list.filter(x => String(x.id) !== String(id));
-  localStorage.setItem(LOCAL_STORAGE_MOVS_KEY, JSON.stringify(filtered));
-  return { source: 'local', ok: true };
+// 5. Restaurar desde Papelera
+async function restoreMovimientoInDB(id) {
+  const dt = getCurrentDateAndTime();
+  return updateMovimientoInDB(id, {
+    borrado: false,
+    editado_hora: `Restaurado a las ${dt.hora} (${dt.fechaDia})`
+  });
 }
 
