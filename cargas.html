@@ -16,15 +16,18 @@
       min-height: 100vh;
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .worker-container {
       width: 100%;
-      max-width: 680px;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 16px 14px 40px;
+      padding: 20px 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
     }
 
     /* BARRA SUPERIOR MINIMALISTA */
@@ -35,17 +38,17 @@
       gap: 12px;
       background: #111827;
       border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 10px 14px;
+      border-radius: 14px;
+      padding: 12px 16px;
     }
     .shift-box {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
     }
     .shift-box label {
-      font-size: 0.76rem;
+      font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: #94a3b8;
@@ -54,12 +57,12 @@
     }
     .shift-input {
       background: #0f172a;
-      border: 1px solid #334155;
+      border: 1.5px solid #334155;
       color: #f8fafc;
-      padding: 8px 12px;
+      padding: 9px 12px;
       border-radius: 8px;
-      font-size: 0.88rem;
-      font-weight: 600;
+      font-size: 0.92rem;
+      font-weight: 700;
       flex: 1;
       min-width: 120px;
     }
@@ -68,28 +71,22 @@
       border-color: #38bdf8;
     }
 
-    /* LOS 2 BOTONES LIMPIOS Y RESPONSIVE */
+    /* LOS 2 BOTONES BIEN GRANDES */
     .big-actions-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
       width: 100%;
-    }
-    @media (max-width: 480px) {
-      .big-actions-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
     }
     .giant-btn {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 30px 16px;
-      border-radius: 16px;
-      border: 2px solid transparent;
+      gap: 8px;
+      padding: 44px 20px;
+      border-radius: 20px;
+      border: 2.5px solid transparent;
       cursor: pointer;
       transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease;
       text-align: center;
@@ -98,46 +95,51 @@
     }
     @media (max-width: 480px) {
       .giant-btn {
-        padding: 24px 14px;
+        padding: 38px 16px;
       }
     }
     .giant-btn:active {
       transform: scale(0.97);
     }
     .giant-btn-carga {
-      background: #059669;
+      background: linear-gradient(180deg, #059669 0%, #047857 100%);
       border-color: #10b981;
-      box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.4);
+      box-shadow: 0 12px 30px -6px rgba(16, 185, 129, 0.45);
     }
     .giant-btn-carga:hover {
-      background: #047857;
-      box-shadow: 0 10px 28px -4px rgba(16, 185, 129, 0.55);
+      background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 16px 36px -4px rgba(16, 185, 129, 0.6);
     }
     .giant-btn-retiro {
-      background: #c2410c;
+      background: linear-gradient(180deg, #c2410c 0%, #9a3412 100%);
       border-color: #f97316;
-      box-shadow: 0 8px 24px -6px rgba(249, 115, 22, 0.4);
+      box-shadow: 0 12px 30px -6px rgba(249, 115, 22, 0.45);
     }
     .giant-btn-retiro:hover {
-      background: #9a3412;
-      box-shadow: 0 10px 28px -4px rgba(249, 115, 22, 0.55);
+      background: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+      box-shadow: 0 16px 36px -4px rgba(249, 115, 22, 0.6);
     }
     .giant-title {
-      font-size: 1.45rem;
+      font-size: 1.85rem;
       font-weight: 900;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       color: #ffffff;
       text-transform: uppercase;
     }
     .giant-sub {
-      font-size: 0.82rem;
+      font-size: 0.95rem;
       color: #e2e8f0;
       font-weight: 500;
     }
     .giant-kbd {
-      margin-top: 2px;
-      font-size: 0.72rem;
-      padding: 2px 8px;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      padding: 3px 12px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #cbd5e1;
+      font-family: 'Consolas', monospace;
+    }
       border-radius: 999px;
       background: rgba(0, 0, 0, 0.25);
       color: #cbd5e1;
@@ -384,54 +386,6 @@
         <span class="giant-sub">Usuario + Monto + Billetera</span>
         <span class="giant-kbd">Atajo: Tecla 2</span>
       </button>
-    </div>
-
-    <!-- RESUMEN DEL DÍA -->
-    <div class="stats-strip">
-      <div class="stat-mini">
-        <span>Cargas Hoy</span>
-        <strong id="statTotalCargas" style="color: #34d399;">$ 0</strong>
-      </div>
-      <div class="stat-mini">
-        <span>Retiros Hoy</span>
-        <strong id="statTotalRetiros" style="color: #fb923c;">$ 0</strong>
-      </div>
-      <div class="stat-mini">
-        <span>Total Movs</span>
-        <strong id="statCountMovs" style="color: #38bdf8;">0</strong>
-      </div>
-    </div>
-
-    <!-- TABLA DE MOVIMIENTOS RECIENTES -->
-    <div class="recent-card">
-      <div class="recent-header">
-        <strong>Movimientos Registrados</strong>
-        <span id="dbStatusBadge" style="font-size: 0.75rem; color: #94a3b8;">
-          Conectando...
-        </span>
-      </div>
-
-      <div style="overflow-x: auto; max-height: 400px;">
-        <table style="width: 100%; border-collapse: collapse; min-width: 520px;">
-          <thead>
-            <tr style="background: #0f172a; border-bottom: 1px solid #1e293b;">
-              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">HORA</th>
-              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">TIPO</th>
-              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">USUARIO</th>
-              <th style="padding: 9px 12px; text-align: right; font-size: 0.74rem; color: #94a3b8;">MONTO</th>
-              <th style="padding: 9px 12px; text-align: left; font-size: 0.74rem; color: #94a3b8;">BILLETERA</th>
-              <th style="padding: 9px 12px; text-align: center; font-size: 0.74rem; color: #94a3b8;">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="movimientosTbody">
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 24px; color: #64748b; font-size: 0.85rem;">
-                No hay movimientos registrados. Tocá NUEVA CARGA o NUEVO RETIRO.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
   </div>
 
@@ -778,91 +732,18 @@ create policy "Acceso publico total movimientos"
     }
 
     async function loadMovimientos() {
-      const badge = document.getElementById('dbStatusBadge');
       const dt = getCurrentDateAndTime();
-
       try {
         const res = await fetchMovimientosFromDB(dt.fechaDia);
         currentMovimientos = res.data || [];
-
-        if (res.source === 'supabase') {
-          badge.innerHTML = `<span style="color:#34d399;">Conectado a la nube</span>`;
-        } else {
-          badge.innerHTML = `<span style="color:#fbbf24;">Memoria local activa</span>`;
-        }
-
         updateKnownUsersDatalist();
-        renderMovimientosTable();
-      } catch (err) {
-        badge.innerHTML = `<span style="color:#f87171;">Sin conexión</span>`;
-      }
+      } catch (err) {}
     }
 
     function updateKnownUsersDatalist() {
       const users = [...new Set(currentMovimientos.map(m => m.usuario).filter(Boolean))];
       const dl = document.getElementById('knownUsersList');
-      dl.innerHTML = users.map(u => `<option value="${escapeHtml(u)}"></option>`).join('');
-    }
-
-    function renderMovimientosTable() {
-      const tbody = document.getElementById('movimientosTbody');
-      const sorted = [...currentMovimientos].sort((a, b) => (b.id || 0) - (a.id || 0));
-
-      let totalCargas = 0;
-      let totalRetiros = 0;
-      currentMovimientos.forEach(m => {
-        if (m.tipo === 'RETIRO') totalRetiros += Number(m.monto) || 0;
-        else totalCargas += Number(m.monto) || 0;
-      });
-
-      document.getElementById('statTotalCargas').textContent = '$ ' + totalCargas.toLocaleString('es-AR');
-      document.getElementById('statTotalRetiros').textContent = '$ ' + totalRetiros.toLocaleString('es-AR');
-      document.getElementById('statCountMovs').textContent = String(currentMovimientos.length);
-
-      if (sorted.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" style="text-align: center; padding: 24px; color: #64748b; font-size: 0.85rem;">
-              No hay movimientos registrados hoy.
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      tbody.innerHTML = sorted.map(m => {
-        const isRetiro = m.tipo === 'RETIRO';
-        const badgeStyle = isRetiro
-          ? 'background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);'
-          : 'background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
-        const amountColor = isRetiro ? '#fb923c' : '#34d399';
-
-        return `
-          <tr style="border-bottom: 1px solid #1e293b;">
-            <td style="padding: 10px 12px; font-family: 'Consolas', monospace; font-size: 0.88rem;">
-              <strong>${escapeHtml(m.hora || '--:--')}</strong>
-            </td>
-            <td style="padding: 10px 12px;">
-              <span style="padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 800; ${badgeStyle}">
-                ${isRetiro ? 'RETIRO' : 'CARGA'}
-              </span>
-            </td>
-            <td style="padding: 10px 12px; font-size: 0.96rem; font-weight: 800; color: #ffffff;">
-              ${escapeHtml(m.usuario)}
-            </td>
-            <td style="padding: 10px 12px; text-align: right; font-family: 'Consolas', monospace; font-size: 1rem; font-weight: 800; color: ${amountColor};">
-              $ ${Number(m.monto || 0).toLocaleString('es-AR')}
-            </td>
-            <td style="padding: 10px 12px; font-size: 0.84rem; color: ${isRetiro ? '#fdba74' : '#475569'};">
-              ${isRetiro ? escapeHtml(m.billetera || '-') : '—'}
-            </td>
-            <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
-              <button class="action-icon-btn" onclick="editMovimiento('${escapeHtml(m.id)}')">Editar</button>
-              <button class="action-icon-btn" onclick="removeMovimiento('${escapeHtml(m.id)}')">Borrar</button>
-            </td>
-          </tr>
-        `;
-      }).join('');
+      if (dl) dl.innerHTML = users.map(u => `<option value="${escapeHtml(u)}"></option>`).join('');
     }
 
     function editMovimiento(id) {
