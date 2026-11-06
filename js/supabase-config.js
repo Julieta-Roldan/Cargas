@@ -49,27 +49,40 @@ async function fetchMovimientosFromDB(fechaDiaFilter = null, includeDeleted = fa
   const { url, key, isConfigured } = getSupabaseCredentials();
 
   if (isConfigured) {
-    let endpoint = `${url}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.desc`;
+    let baseEndpoint = `${url}/rest/v1/${SUPABASE_TABLE}?select=*&order=id.desc`;
     if (!includeDeleted) {
       // Por defecto solo traer los no borrados (o donde borrado sea null/false)
-      endpoint += `&or=(borrado.is.null,borrado.eq.false)`;
+      baseEndpoint += `&or=(borrado.is.null,borrado.eq.false)`;
     }
     if (fechaDiaFilter && fechaDiaFilter !== 'all') {
-      endpoint += `&fecha_dia=eq.${encodeURIComponent(fechaDiaFilter)}`;
+      baseEndpoint += `&fecha_dia=eq.${encodeURIComponent(fechaDiaFilter)}`;
     }
-    const res = await fetch(endpoint, {
-      headers: {
-        'apikey': key,
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json'
+
+    const allData = [];
+    const pageSize = 1000;
+    let offset = 0;
+
+    while (true) {
+      const endpoint = `${baseEndpoint}&limit=${pageSize}&offset=${offset}`;
+      const res = await fetch(endpoint, {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Error Supabase (${res.status}): ${errText}`);
       }
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Error Supabase (${res.status}): ${errText}`);
+      const chunk = await res.json();
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      allData.push(...chunk);
+      if (chunk.length < pageSize) break;
+      offset += pageSize;
     }
-    const data = await res.json();
-    return { source: 'supabase', data };
+
+    return { source: 'supabase', data: allData };
   }
 
   // Modo Local (mientras no se haya configurado Supabase)

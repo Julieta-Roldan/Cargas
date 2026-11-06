@@ -45,7 +45,11 @@ function extractPanelMovementsAndDebug(raw) {
   // 1. Quitar envoltorios de links Markdown [texto](https://...) por si se pegó con formato enriquecido
   let text = String(raw).replace(/\[([^\]]*)\]\(https?:\/\/[^\)]+\)/gi, '$1');
 
-  // 2. Separar si quedaron dos registros pegados en la misma línea
+  // 2. Separar si al pegar otra página sin apretar Enter quedó el último número pegado al encabezado (ej: "5000naycelu543 (1.915.983 )") o a otro ID
+  text = text.replace(/(\d)([a-zA-Z_][a-zA-Z0-9_.-]*\s*\(\s*[-\d.,]+\s*\))/g, '$1\n$2');
+  text = text.replace(/(\d\s+[-\d.,]+\s+[-\d.,]+?)([a-z0-9]{4}[\t ]+\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})/gi, '$1\n$2');
+
+  // 3. Separar si quedaron dos registros pegados en la misma línea
   text = text.replace(/(\S)\s+([a-z0-9]{3,10}\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}\s+(?:DEPOSITO|DEPÓSITO|RETIRO))/gi, '$1\n$2');
 
   const rawRecords = [];
@@ -1020,7 +1024,8 @@ async function syncSupabaseMovimientos(silent = false) {
 
   try {
     const res = await fetchMovimientosFromDB('all');
-    const list = res.data || [];
+    // Ordenar en orden cronológico ascendente (del primero del día al último) para que el motor de horarios cruce exacto
+    const list = [...(res.data || [])].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
 
     const parsed = list.map((m, idx) => {
       const isRetiro = m.tipo === 'RETIRO';
@@ -1038,6 +1043,7 @@ async function syncSupabaseMovimientos(silent = false) {
 
       return {
         uid,
+        fromSupabase: true,
         excelRowNumber: rowNum,
         rowIndex0: idx,
         colOkIndex: 5,

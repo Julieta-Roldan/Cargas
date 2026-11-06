@@ -192,12 +192,20 @@ function formatMoney(num) {
 
 function normalizeUser(u) {
   if (!u) return '';
-  return String(u)
+  let clean = String(u)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '');
+    .toLowerCase();
+  // Si la trabajadora escribió una aclaración después del usuario (ej: "leandroxbenitez cargue 10 y era 1500"),
+  // usar solo el primer bloque (el nombre de usuario real) para comparar
+  const firstToken = clean.split(/[\s(]+/)[0];
+  if (firstToken && firstToken.length >= 4) {
+    clean = firstToken;
+  } else {
+    clean = clean.replace(/\s+/g, '');
+  }
+  return clean;
 }
 
 // Esqueleto fonético/de letras para detectar cuando el trabajador abrevia o comete un error de tipeo

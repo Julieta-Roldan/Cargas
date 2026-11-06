@@ -21,6 +21,14 @@ function precalculateExcelEstimatedMinutes(excelItems) {
     const n = dayItems.length;
     if (n === 0) return;
 
+    // Si los datos vienen de Supabase (cargas.html), los horarios ya están en formato 24h exacto
+    if (dayItems.every(it => it.fromSupabase)) {
+      dayItems.forEach(item => {
+        item.estMinutes = item.minutesOfDay ?? 0;
+      });
+      return;
+    }
+
     const anchors = [];
     let maxSeenMins = 0;
 
@@ -100,8 +108,71 @@ function runComparison() {
   const usedExcel = new Set();
   const results = [];
 
-  // PASO 1: Coincidencia EXACTA de usuario + mismo monto (eligiendo el más cercano en horario real)
+  // PASO 1A: Coincidencia EXACTA de usuario + mismo monto + horario cercano (<= 45 min), priorizando los más cercanos globalmente
+  const exactClosePairs = [];
   excelItems.forEach((eItem) => {
+    panelItems.forEach((pItem) => {
+      if (pItem.tipo !== eItem.tipo) return;
+      if (!sameDayOrUnknown(pItem, eItem)) return;
+      if (pItem.usuarioNorm === eItem.usuarioNorm && Math.abs(pItem.monto - eItem.monto) < 0.01) {
+        const timeDiff = getTimeDiffMinutes(pItem, eItem);
+        if (timeDiff <= 45) {
+          exactClosePairs.push({ eItem, pItem, timeDiff });
+        }
+      }
+    });
+  });
+  exactClosePairs.sort((a, b) => a.timeDiff - b.timeDiff);
+  exactClosePairs.forEach(({ eItem, pItem }) => {
+    if (usedExcel.has(eItem.uid) || usedPanel.has(pItem.uid)) return;
+    usedPanel.add(pItem.uid);
+    usedExcel.add(eItem.uid);
+    results.push({
+      key: eItem.uid,
+      status: 'matched',
+      matchNote: '',
+      tipo: eItem.tipo,
+      panel: pItem,
+      excel: eItem
+    });
+  });
+
+  // PASO 1B: Coincidencia por NOMBRE SIMILAR + mismo monto + horario cercano (<= 45 min), antes de saltar horas o sumar cargas
+  const similarClosePairs = [];
+  excelItems.forEach((eItem) => {
+    if (usedExcel.has(eItem.uid)) return;
+    panelItems.forEach((pItem) => {
+      if (usedPanel.has(pItem.uid)) return;
+      if (pItem.tipo !== eItem.tipo) return;
+      if (!sameDayOrUnknown(pItem, eItem)) return;
+      if (Math.abs(pItem.monto - eItem.monto) >= 0.01) return;
+      const sim = userSimilarity(eItem.usuarioOriginal, pItem.usuarioOriginal);
+      const timeDiff = getTimeDiffMinutes(pItem, eItem);
+      if (sim >= 0.72 && timeDiff <= 45) {
+        const score = sim - (timeDiff / 120) * 0.25;
+        similarClosePairs.push({ eItem, pItem, score, sim });
+      }
+    });
+  });
+  similarClosePairs.sort((a, b) => b.score - a.score);
+  similarClosePairs.forEach(({ eItem, pItem }) => {
+    if (usedExcel.has(eItem.uid) || usedPanel.has(pItem.uid)) return;
+    usedPanel.add(pItem.uid);
+    usedExcel.add(eItem.uid);
+    const isExactAfterNorm = pItem.usuarioNorm === eItem.usuarioNorm;
+    results.push({
+      key: eItem.uid,
+      status: isExactAfterNorm ? 'matched' : 'similar',
+      matchNote: isExactAfterNorm ? '' : 'Usuario escrito distinto',
+      tipo: eItem.tipo,
+      panel: pItem,
+      excel: eItem
+    });
+  });
+
+  // PASO 2A: Coincidencia EXACTA de usuario + mismo monto a mayor distancia de horario
+  excelItems.forEach((eItem) => {
+    if (usedExcel.has(eItem.uid)) return;
     let bestP = null;
     let bestTimeDiff = Infinity;
 
@@ -111,7 +182,8 @@ function runComparison() {
       if (!sameDayOrUnknown(pItem, eItem)) return;
       if (pItem.usuarioNorm === eItem.usuarioNorm && Math.abs(pItem.monto - eItem.monto) < 0.01) {
         const timeDiff = getTimeDiffMinutes(pItem, eItem);
-        if (timeDiff <= 360 && timeDiff < bestTimeDiff) {
+        const maxAllowed = (eItem.minutesOfDay !== null && eItem.minutesOfDay !== undefined) ? 180 : 360;
+        if (timeDiff <= maxAllowed && timeDiff < bestTimeDiff) {
           bestTimeDiff = timeDiff;
           bestP = pItem;
         }
@@ -132,50 +204,7 @@ function runComparison() {
     }
   });
 
-  // PASO 2: Suma de 2 cargas seguidas del mismo usuario en el Panel que suman el monto del Excel
-  excelItems.forEach((eItem) => {
-    if (usedExcel.has(eItem.uid)) return;
-    for (let i = 0; i < panelItems.length; i++) {
-      const p1 = panelItems[i];
-      if (usedPanel.has(p1.uid) || p1.tipo !== eItem.tipo) continue;
-      if (!sameDayOrUnknown(p1, eItem)) continue;
-      const sim1 = userSimilarity(p1.usuarioOriginal, eItem.usuarioOriginal);
-      if (sim1 < 0.72) continue;
-      if (getTimeDiffMinutes(p1, eItem) > 300) continue;
-
-      for (let j = i + 1; j < panelItems.length; j++) {
-        const p2 = panelItems[j];
-        if (usedPanel.has(p2.uid) || p2.tipo !== eItem.tipo) continue;
-        if (!sameDayOrUnknown(p2, eItem)) continue;
-        if (p1.usuarioNorm !== p2.usuarioNorm) continue;
-        if (Math.abs(p1.minutesOfDay - p2.minutesOfDay) <= 15 && Math.abs((p1.monto + p2.monto) - eItem.monto) < 0.01) {
-          usedPanel.add(p1.uid);
-          usedPanel.add(p2.uid);
-          usedExcel.add(eItem.uid);
-          const combinedPanel = {
-            ...p1,
-            id: `${p1.id} + ${p2.id}`,
-            monto: p1.monto + p2.monto,
-            deposito: p1.deposito + p2.deposito,
-            retiro: p1.retiro + p2.retiro,
-            combinedParts: `${formatMoney(p1.monto)} + ${formatMoney(p2.monto)}`
-          };
-          results.push({
-            key: eItem.uid,
-            status: 'similar',
-            matchNote: `Suma de 2 cargas (${combinedPanel.combinedParts})`,
-            tipo: eItem.tipo,
-            panel: combinedPanel,
-            excel: eItem
-          });
-          break;
-        }
-      }
-      if (usedExcel.has(eItem.uid)) break;
-    }
-  });
-
-  // PASO 3: Coincidencia por NOMBRE SIMILAR + MISMO MONTO + CERCANÍA DE HORARIO REAL
+  // PASO 2B: Coincidencia por NOMBRE SIMILAR + MISMO MONTO a mayor distancia de horario
   excelItems.forEach((eItem) => {
     if (usedExcel.has(eItem.uid)) return;
     let bestP = null;
@@ -211,6 +240,50 @@ function runComparison() {
         panel: bestP,
         excel: eItem
       });
+    }
+  });
+
+  // PASO 3: Suma de 2 cargas seguidas del mismo usuario en el Panel que suman el monto del Excel (solo para las que no cruzaron 1 a 1)
+  excelItems.forEach((eItem) => {
+    if (usedExcel.has(eItem.uid)) return;
+    const maxSumTimeDiff = (eItem.minutesOfDay !== null && eItem.minutesOfDay !== undefined) ? 60 : 240;
+    for (let i = 0; i < panelItems.length; i++) {
+      const p1 = panelItems[i];
+      if (usedPanel.has(p1.uid) || p1.tipo !== eItem.tipo) continue;
+      if (!sameDayOrUnknown(p1, eItem)) continue;
+      const sim1 = userSimilarity(p1.usuarioOriginal, eItem.usuarioOriginal);
+      if (sim1 < 0.72) continue;
+      if (getTimeDiffMinutes(p1, eItem) > maxSumTimeDiff) continue;
+
+      for (let j = i + 1; j < panelItems.length; j++) {
+        const p2 = panelItems[j];
+        if (usedPanel.has(p2.uid) || p2.tipo !== eItem.tipo) continue;
+        if (!sameDayOrUnknown(p2, eItem)) continue;
+        if (p1.usuarioNorm !== p2.usuarioNorm) continue;
+        if (Math.abs(p1.minutesOfDay - p2.minutesOfDay) <= 15 && Math.abs((p1.monto + p2.monto) - eItem.monto) < 0.01) {
+          usedPanel.add(p1.uid);
+          usedPanel.add(p2.uid);
+          usedExcel.add(eItem.uid);
+          const combinedPanel = {
+            ...p1,
+            id: `${p1.id} + ${p2.id}`,
+            monto: p1.monto + p2.monto,
+            deposito: p1.deposito + p2.deposito,
+            retiro: p1.retiro + p2.retiro,
+            combinedParts: `${formatMoney(p1.monto)} + ${formatMoney(p2.monto)}`
+          };
+          results.push({
+            key: eItem.uid,
+            status: 'similar',
+            matchNote: `Suma de 2 cargas (${combinedPanel.combinedParts})`,
+            tipo: eItem.tipo,
+            panel: combinedPanel,
+            excel: eItem
+          });
+          break;
+        }
+      }
+      if (usedExcel.has(eItem.uid)) break;
     }
   });
 
