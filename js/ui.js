@@ -294,6 +294,147 @@ function uncheckAll() {
 }
 
 // =========================================================
+// CORREGIR NOMBRE DE USUARIO DESDE LA FILA SELECCIONADA (FLECHA IZQUIERDA ←)
+// =========================================================
+async function quickFixSelectedUserName() {
+  const row = AppState.comparisonResults.find(r => r.key === AppState.selectedRowKey);
+  if (!row) {
+    showToast('⚠️ Seleccioná una fila primero con un clic o con las flechas');
+    return;
+  }
+
+  // Obtener el nombre sugerido (del panel si existe, o el actual de sheets)
+  const currentExcelUser = row.excel ? String(row.excel.usuarioOriginal || '').trim() : '';
+  const suggestedName = row.panel ? String(row.panel.usuarioOriginal || '').trim() : currentExcelUser;
+
+  if (!currentExcelUser) {
+    showToast('⚠️ Esta fila no proviene de las cargas de las trabajadoras');
+    return;
+  }
+
+  const promptMsg = (suggestedName && suggestedName.toLowerCase() !== currentExcelUser.toLowerCase())
+    ? `✏️ Corregir nombre mal tipeado en Supabase:\n\nNombre anotado por la trabajadora: "${currentExcelUser}"\nNombre real en el Panel: "${suggestedName}"\n\n¿A qué nombre querés corregirlo para todas las cargas anteriores y futuras sugerencias?:`
+    : `✏️ Editar nombre de usuario en Supabase:\n\nUsuario actual: "${currentExcelUser}"\n\nIngresá el nombre corregido:`;
+
+  const newName = prompt(promptMsg, suggestedName || currentExcelUser);
+  if (!newName || newName.trim() === '' || newName.trim() === currentExcelUser) {
+    return;
+  }
+
+  const corrected = newName.trim();
+  const { url, key, isConfigured } = getSupabaseCredentials();
+
+  if (!isConfigured) {
+    alert('Supabase no está configurado');
+    return;
+  }
+
+  try {
+    showToast(`Actualizando "${currentExcelUser}" a "${corrected}" en Supabase...`);
+
+    const res = await fetch(`${url}/rest/v1/movimientos?usuario=eq.${encodeURIComponent(currentExcelUser)}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ usuario: corrected })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
+
+    showToast(`✅ "${currentExcelUser}" corregido a "${corrected}"`);
+
+    // Actualizar en memoria local inmediatamente para refrescar la tabla al instante
+    AppState.excelItems.forEach(it => {
+      if (it.usuarioOriginal === currentExcelUser) {
+        it.usuarioOriginal = corrected;
+        it.usuarioNorm = normalizeUser(corrected);
+      }
+    });
+
+    // Re-ejecutar comparación y volver a seleccionar
+    runComparison();
+    if (AppState.selectedRowKey) {
+      selectRow(AppState.selectedRowKey, false);
+    }
+
+    // Refrescar en segundo plano los datos desde Supabase
+    if (typeof syncSupabaseMovimientos === 'function') {
+      syncSupabaseMovimientos(true);
+    }
+  } catch (err) {
+    alert('Error al corregir usuario en Supabase: ' + err.message);
+  }
+}
+
+// =========================================================
+// ATAJOS DE TECLADO GLOBALES EN EL PANEL (FLECHAS, ESPACIO, ENTER, ETC)
+// =========================================================
+window.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('keydown', (e) => {
+    // Si la pantalla de login con +991 está activa y aún no se logueó, no interferir
+    if (!sessionStorage.getItem('admin_logged_in_user')) return;
+
+    // Si el foco está en un campo de texto, no interceptar las flechas
+    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+    if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+      return;
+    }
+
+    // Flecha Arriba: Subir fila
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveSelection(-1);
+      return;
+    }
+
+    // Flecha Abajo: Bajar fila
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection(1);
+      return;
+    }
+
+    // Flecha Derecha o Espacio: Marcar/Desmarcar OK
+    if (e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      toggleSelectedCheck();
+      return;
+    }
+
+    // Flecha Izquierda: Editar / Corregir nombre de usuario en Supabase
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      quickFixSelectedUserName();
+      return;
+    }
+
+    // Enter: Abrir modal de comparación si no está abierto
+    if (e.key === 'Enter') {
+      if (!AppState.isModalOpen) {
+        e.preventDefault();
+        openComparisonModalForSelected();
+      }
+      return;
+    }
+
+    // Escape: Cerrar modal si está abierto
+    if (e.key === 'Escape') {
+      if (AppState.isModalOpen) {
+        e.preventDefault();
+        closeComparisonModal();
+      }
+    }
+  });
+});
+
+// =========================================================
 // NAVEGACIÓN DE FILAS (1 CLIC, FLECHAS ARRIBA/ABAJO, DOBLE CLIC)
 // =========================================================
 function selectRow(key, scrollIntoView = false) {
@@ -469,6 +610,13 @@ function renderComparisonModalContent() {
           ${isChecked ? '✅ VERIFICADO (OK)' : '⏳ Pendiente de marcar'}
         </div>
       </div>
+      ${e ? `
+      <div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Corregir Nombre (←)</div>
+        <button class="btn btn-outline" onclick="quickFixSelectedUserName()" style="padding: 4px 10px; font-size: 0.76rem; border-color: #818cf8; color: #a5b4fc; margin-top: 2px;">
+          ✏️ Corregir en Supabase
+        </button>
+      </div>` : ''}
     </div>
 
     <div class="compare-grid">

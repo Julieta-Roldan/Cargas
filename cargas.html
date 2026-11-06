@@ -140,6 +140,57 @@
       color: #cbd5e1;
       font-family: 'Consolas', monospace;
     }
+    /* BOTON DIAS EN MINI HISTORIAL */
+    .btn-dias-historial {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #38bdf8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-transform: none;
+      transition: all 0.15s ease;
+    }
+    .btn-dias-historial:hover {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+    .mini-history-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dia-chip-item {
+      padding: 10px 14px;
+      background: #0f172a;
+      border: 1.5px solid #334155;
+      border-radius: 8px;
+      color: #cbd5e1;
+      font-weight: 700;
+      font-size: 0.92rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.12s ease;
+    }
+    .dia-chip-item:hover {
+      background: #1e293b;
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+    .dia-chip-item.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
     /* LISTA SIMPLE DE MOVIMIENTOS RECIENTES */
     .mini-history-card {
       background: #111827;
@@ -414,6 +465,115 @@
       border-color: #38bdf8;
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
     }
+    /* AUTOCOMPLETADO PREDICTIVO MEJORADO */
+    .qm-autocomplete-wrap {
+      position: relative;
+    }
+    .qm-predictive-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #0f172a;
+      border: 1.5px solid #38bdf8;
+      border-radius: 8px;
+      margin-top: 4px;
+      max-height: 210px;
+      overflow-y: auto;
+      z-index: 2500;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      display: none;
+    }
+    .qm-predictive-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.1s ease;
+    }
+    .qm-predictive-item:last-child {
+      border-bottom: none;
+    }
+    .qm-predictive-item:hover, .qm-predictive-item.selected {
+      background: #1e293b;
+      color: #38bdf8;
+    }
+    .qm-predictive-item mark {
+      background: transparent;
+      color: #38bdf8;
+      font-weight: 900;
+      text-decoration: underline;
+    }
+    .qm-predictive-badge {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    /* BOTONES RÁPIDOS DE MONTO (500, 1000, 5000, 10000) */
+    .amount-quick-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid #d97706;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 8px;
+      background: #090e1a;
+    }
+    .amount-quick-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid #d97706;
+      padding: 10px 4px;
+      color: #fbbf24;
+      font-weight: 800;
+      font-size: 0.92rem;
+      font-family: 'Consolas', monospace;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.12s ease;
+      user-select: none;
+    }
+    .amount-quick-btn:last-child {
+      border-right: none;
+    }
+    .amount-quick-btn:hover {
+      background: rgba(245, 158, 11, 0.15);
+      color: #ffffff;
+    }
+    .amount-quick-btn:active {
+      background: #d97706;
+      color: #0b1120;
+    }
+
+    /* CAMPO REGALÍA */
+    .qm-regalia-wrap {
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px dashed rgba(16, 185, 129, 0.35);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .qm-regalia-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .qm-regalia-header label {
+      margin-bottom: 0;
+      color: #34d399;
+    }
+    .qm-regalia-info {
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+
     .wallet-chips {
       display: flex;
       gap: 6px;
@@ -509,11 +669,34 @@
     <!-- LISTA SIMPLE DE MOVIMIENTOS RECIENTES (TOCAR PARA EDITAR O BORRAR) -->
     <div class="mini-history-card">
       <div class="mini-history-header">
-        <span>Movimientos Recientes</span>
-        <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">(Tocar para editar o borrar)</span>
+        <span>Movimientos <span id="miniHistoryDayLabel" style="color: #38bdf8; font-weight: normal; text-transform: none;"></span></span>
+        <div class="mini-history-header-right">
+          <span style="font-size: 0.72rem; color: #64748b; font-weight: normal;">(Tocar para editar o borrar)</span>
+          <button type="button" class="btn-dias-historial" onclick="openDiasModal()" title="Seleccionar día de movimientos">
+            📅 <span id="btnDiasLabel">Días</span>
+          </button>
+        </div>
       </div>
       <div class="mini-history-list" id="miniHistoryList">
         <div class="mini-empty">Cargando movimientos...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL: SELECCIONAR DÍA PARA HISTORIAL                     -->
+  <!-- ========================================================= -->
+  <div class="quick-modal-backdrop" id="diasModalBackdrop" onclick="handleBackdropClick(event, 'diasModalBackdrop')">
+    <div class="quick-modal" style="max-width: 360px; border-color: #38bdf8;">
+      <div class="qm-header" style="margin-bottom: 10px;">
+        <div class="qm-title" style="color: #38bdf8; font-size: 1.1rem;">📅 SELECCIONAR DÍA</div>
+        <button class="modal-close" onclick="closeDiasModal()" type="button">✕</button>
+      </div>
+      <p style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 12px;">
+        Elegí qué día querés consultar en los movimientos recientes:
+      </p>
+      <div id="diasListContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;">
+        <div style="text-align: center; color: #64748b; padding: 15px; font-size: 0.82rem;">Cargando días disponibles...</div>
       </div>
     </div>
   </div>
@@ -548,30 +731,59 @@
           </button>
         </div>
 
-        <!-- CAMPO 1: USUARIO -->
+        <!-- CAMPO 1: USUARIO CON AUTOCOMPLETADO PREDICTIVO MEJORADO -->
         <div class="qm-field">
           <label for="qmUsuario">1. Nombre de Usuario</label>
-          <input
-            type="text"
-            id="qmUsuario"
-            class="qm-input"
-            list="knownUsersList"
-            placeholder="Ej: selenanvxx"
-            required
-          />
+          <div class="qm-autocomplete-wrap">
+            <input
+              type="text"
+              id="qmUsuario"
+              class="qm-input"
+              placeholder="Ej: selenanvxx"
+              autocomplete="off"
+              required
+              oninput="handleUserPredictiveInput(this.value)"
+              onkeydown="handleUserPredictiveKeyDown(event)"
+              onfocus="handleUserPredictiveFocus()"
+            />
+            <div class="qm-predictive-dropdown" id="userPredictiveDropdown"></div>
+          </div>
           <datalist id="knownUsersList"></datalist>
         </div>
 
-        <!-- CAMPO 2: MONTO -->
+        <!-- CAMPO 2: MONTO + BOTONES RÁPIDOS (500, 1000, 5000, 10000) -->
         <div class="qm-field">
-          <label for="qmMonto">2. Monto ($)</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label for="qmMonto" style="margin-bottom: 0;">2. Monto ($)</label>
+            <span id="montoTotalSumPreview" style="font-size: 0.76rem; color: #34d399; font-weight: 800; font-family: monospace; display: none;"></span>
+          </div>
           <input
             type="text"
             inputmode="decimal"
             id="qmMonto"
             class="qm-input"
-            placeholder="Ej: 5000 o 30.000"
+            placeholder="0"
             required
+            oninput="updateMontoTotalPreview()"
+          />
+          <div class="amount-quick-bar">
+            <button type="button" class="amount-quick-btn" onclick="setQuickAmount(500)">500</button>
+            <button type="button" class="amount-quick-btn" onclick="setQuickAmount(1000)">1000</button>
+            <button type="button" class="amount-quick-btn" onclick="setQuickAmount(5000)">5000</button>
+            <button type="button" class="amount-quick-btn" onclick="setQuickAmount(10000)">10000</button>
+          </div>
+        </div>
+
+        <!-- CAMPO REGALÍA (OPCIONAL, SOLO PARA CARGA - SE SUMA AL MONTO) -->
+        <div class="qm-field" id="qmRegaliaWrap">
+          <label for="qmRegalia">Regalía</label>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="qmRegalia"
+            class="qm-input"
+            placeholder="Ej: 500"
+            oninput="updateMontoTotalPreview()"
           />
         </div>
 
@@ -741,6 +953,8 @@ create policy "Acceso publico total movimientos"
     }
 
     let currentMovimientos = [];
+    let currentSelectedDay = null; // null = día actual de hoy
+    let availableDaysList = [];
     let clockInterval = null;
     let secretBuffer = ''; // Detección de la clave secreta +991
 
@@ -764,12 +978,14 @@ create policy "Acceso publico total movimientos"
       // Detección de teclado general y combinación secreta +991
       document.addEventListener('keydown', (e) => {
         const isModalOpen = document.getElementById('quickModalBackdrop').classList.contains('open') ||
-                            document.getElementById('supabaseModalBackdrop').classList.contains('open');
+                            document.getElementById('supabaseModalBackdrop').classList.contains('open') ||
+                            (document.getElementById('diasModalBackdrop') && document.getElementById('diasModalBackdrop').classList.contains('open'));
 
         if (isModalOpen) {
           if (e.key === 'Escape') {
             closeQuickModal();
             closeSupabaseModal();
+            closeDiasModal();
           }
           return;
         }
@@ -834,6 +1050,133 @@ create policy "Acceso publico total movimientos"
       document.getElementById('qmAutoClock').textContent = `${dt.hora} hs · Fecha ${dt.fechaDia}`;
     }
 
+    // Lista global de usuarios para predicción inteligente
+    let allPredictiveUsers = [];
+    let predictiveSelectedIndex = -1;
+
+    function setQuickAmount(val) {
+      const input = document.getElementById('qmMonto');
+      const current = parseAmount(input.value) || 0;
+      const total = current + Number(val || 0);
+      input.value = total;
+      updateMontoTotalPreview();
+      input.focus();
+    }
+
+    function updateMontoTotalPreview() {
+      const tipo = document.getElementById('qmTipo').value;
+      const rawMonto = parseAmount(document.getElementById('qmMonto').value);
+      const rawRegalia = (tipo === 'DEPOSITO') ? parseAmount(document.getElementById('qmRegalia').value) : 0;
+      const preview = document.getElementById('montoTotalSumPreview');
+
+      if (!preview) return;
+      if (rawRegalia > 0 && rawMonto > 0) {
+        const total = rawMonto + rawRegalia;
+        preview.style.display = 'inline-block';
+        preview.textContent = `Total a cargar: $ ${total.toLocaleString('es-AR')} ($ ${rawMonto.toLocaleString('es-AR')} + $ ${rawRegalia.toLocaleString('es-AR')} reg.)`;
+      } else {
+        preview.style.display = 'none';
+        preview.textContent = '';
+      }
+    }
+
+    function handleUserPredictiveFocus() {
+      // No abrir nada al hacer clic o foco con el campo vacío
+      const val = document.getElementById('qmUsuario').value.trim();
+      if (val.length >= 1) {
+        handleUserPredictiveInput(val);
+      }
+    }
+
+    function handleUserPredictiveInput(val) {
+      const dropdown = document.getElementById('userPredictiveDropdown');
+      if (!dropdown) return;
+      const q = String(val || '').trim().toLowerCase();
+
+      // No mostrar nada si el input está vacío; solo a medida que el usuario escribe
+      if (!q) {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+        predictiveSelectedIndex = -1;
+        return;
+      }
+
+      const matches = allPredictiveUsers.filter(u => u.name.toLowerCase().includes(q)).slice(0, 8);
+
+      if (matches.length === 0) {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+        predictiveSelectedIndex = -1;
+        return;
+      }
+
+      predictiveSelectedIndex = -1;
+      dropdown.style.display = 'block';
+      dropdown.innerHTML = matches.map((m, idx) => {
+        const rx = new RegExp(`(${q.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+        const highlighted = escapeHtml(m.name).replace(rx, '<mark>$1</mark>');
+        return `
+          <div class="qm-predictive-item" data-idx="${idx}" onmousedown="selectPredictiveUser('${escapeHtml(m.name)}')">
+            <span>${highlighted}</span>
+            <span class="qm-predictive-badge">${m.count ? m.count + ' cargas' : ''}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function handleUserPredictiveKeyDown(e) {
+      const dropdown = document.getElementById('userPredictiveDropdown');
+      if (!dropdown || dropdown.style.display === 'none') return;
+
+      const items = dropdown.querySelectorAll('.qm-predictive-item');
+      if (items.length === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        predictiveSelectedIndex = (predictiveSelectedIndex + 1) % items.length;
+        highlightPredictiveItem(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        predictiveSelectedIndex = (predictiveSelectedIndex - 1 + items.length) % items.length;
+        highlightPredictiveItem(items);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (predictiveSelectedIndex >= 0 && predictiveSelectedIndex < items.length) {
+          e.preventDefault();
+          const chosen = items[predictiveSelectedIndex].querySelector('span').textContent.trim();
+          selectPredictiveUser(chosen);
+        }
+      } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    }
+
+    function highlightPredictiveItem(items) {
+      items.forEach((it, idx) => {
+        it.classList.toggle('selected', idx === predictiveSelectedIndex);
+        if (idx === predictiveSelectedIndex) {
+          it.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+
+    function selectPredictiveUser(userName) {
+      const input = document.getElementById('qmUsuario');
+      input.value = userName;
+      const dropdown = document.getElementById('userPredictiveDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+      setTimeout(() => {
+        document.getElementById('qmMonto').focus();
+      }, 40);
+    }
+
+    // Cerrar predictivo si se hace clic afuera
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.qm-autocomplete-wrap')) {
+        const dropdown = document.getElementById('userPredictiveDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+      }
+    });
+
     function setModalTipo(nuevoTipo) {
       const box = document.getElementById('quickModalBox');
       const titleEl = document.getElementById('qmTitle');
@@ -845,6 +1188,7 @@ create policy "Acceso publico total movimientos"
       const editId = document.getElementById('qmEditId').value;
 
       document.getElementById('qmTipo').value = nuevoTipo;
+      const regaliaWrap = document.getElementById('qmRegaliaWrap');
 
       if (nuevoTipo === 'RETIRO') {
         box.className = 'quick-modal mode-retiro';
@@ -853,6 +1197,7 @@ create policy "Acceso publico total movimientos"
         titleEl.textContent = editId ? 'EDITAR RETIRO' : 'NUEVO RETIRO';
         billeteraWrap.style.display = 'block';
         billeteraInput.required = true;
+        if (regaliaWrap) regaliaWrap.style.display = 'none';
         submitBtn.className = 'qm-submit-btn qm-submit-retiro';
         submitBtn.textContent = editId ? 'GUARDAR CAMBIOS (ENTER)' : 'REGISTRAR RETIRO (ENTER)';
       } else {
@@ -862,9 +1207,11 @@ create policy "Acceso publico total movimientos"
         titleEl.textContent = editId ? 'EDITAR CARGA' : 'NUEVA CARGA';
         billeteraWrap.style.display = 'none';
         billeteraInput.required = false;
+        if (regaliaWrap) regaliaWrap.style.display = 'block';
         submitBtn.className = 'qm-submit-btn qm-submit-carga';
         submitBtn.textContent = editId ? 'GUARDAR CAMBIOS (ENTER)' : 'GUARDAR CARGA (ENTER)';
       }
+      updateMontoTotalPreview();
     }
 
     function openQuickModal(tipo, editItem = null) {
@@ -878,6 +1225,9 @@ create policy "Acceso publico total movimientos"
 
       document.getElementById('qmUsuario').value = editItem ? editItem.usuario : '';
       document.getElementById('qmMonto').value = editItem ? editItem.monto : '';
+      const regaliaInput = document.getElementById('qmRegalia');
+      if (regaliaInput) regaliaInput.value = '';
+      updateMontoTotalPreview();
       billeteraInput.value = editItem ? (editItem.billetera || '') : '';
 
       if (editItem) {
@@ -941,7 +1291,16 @@ create policy "Acceso publico total movimientos"
       const tipo = document.getElementById('qmTipo').value;
       const usuario = document.getElementById('qmUsuario').value.trim();
       const rawMonto = document.getElementById('qmMonto').value.trim();
-      const monto = parseAmount(rawMonto);
+      let monto = parseAmount(rawMonto);
+
+      // Si es CARGA y tiene regalía, sumarla al monto total
+      if (tipo === 'DEPOSITO') {
+        const regaliaVal = parseAmount(document.getElementById('qmRegalia').value);
+        if (regaliaVal > 0) {
+          monto += regaliaVal;
+        }
+      }
+
       const billetera = tipo === 'RETIRO' ? document.getElementById('qmBilletera').value.trim() : '';
       const turno = document.getElementById('workerShiftInput').value.trim() || 'Turno Actual';
 
@@ -1001,8 +1360,21 @@ create policy "Acceso publico total movimientos"
 
     async function loadMovimientos() {
       const dt = getCurrentDateAndTime();
+      const targetDay = currentSelectedDay || dt.fechaDia;
+
+      const dayLabel = document.getElementById('miniHistoryDayLabel');
+      const btnDiasLabel = document.getElementById('btnDiasLabel');
+      if (dayLabel) {
+        dayLabel.textContent = (currentSelectedDay && currentSelectedDay !== dt.fechaDia)
+          ? `(${targetDay})`
+          : `(Hoy ${dt.fechaDia})`;
+      }
+      if (btnDiasLabel) {
+        btnDiasLabel.textContent = targetDay;
+      }
+
       try {
-        const res = await fetchMovimientosFromDB(dt.fechaDia, false);
+        const res = await fetchMovimientosFromDB(targetDay, false);
         currentMovimientos = res.data || [];
         updateKnownUsersDatalist();
         renderMiniHistory();
@@ -1010,6 +1382,70 @@ create policy "Acceso publico total movimientos"
         const el = document.getElementById('miniHistoryList');
         if (el) el.innerHTML = `<div class="mini-empty" style="color:#f87171;">Sin conexión</div>`;
       }
+    }
+
+    async function openDiasModal() {
+      const backdrop = document.getElementById('diasModalBackdrop');
+      const container = document.getElementById('diasListContainer');
+      backdrop.classList.add('open');
+      container.innerHTML = `<div style="text-align: center; color: #64748b; padding: 15px; font-size: 0.82rem;">Cargando días...</div>`;
+
+      const { url, key, isConfigured } = getSupabaseCredentials();
+      const dt = getCurrentDateAndTime();
+      const daysMap = {};
+      daysMap[dt.fechaDia] = 0; // Garantizar que el día de hoy siempre esté
+
+      if (isConfigured) {
+        try {
+          const res = await fetch(`${url}/rest/v1/${SUPABASE_TABLE}?select=fecha_dia,borrado&or=(borrado.is.null,borrado.eq.false)&order=id.desc&limit=1000`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              data.forEach(item => {
+                if (item.fecha_dia) {
+                  daysMap[item.fecha_dia] = (daysMap[item.fecha_dia] || 0) + 1;
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Error al listar días:', e);
+        }
+      }
+
+      const daysArr = Object.keys(daysMap).sort((a, b) => {
+        if (a === dt.fechaDia) return -1;
+        if (b === dt.fechaDia) return 1;
+        return b.localeCompare(a);
+      });
+
+      const currentActive = currentSelectedDay || dt.fechaDia;
+
+      container.innerHTML = daysArr.map(d => {
+        const isToday = d === dt.fechaDia;
+        const isActive = d === currentActive;
+        const count = daysMap[d] || 0;
+        return `
+          <div class="dia-chip-item ${isActive ? 'active' : ''}" onclick="selectDayFromModal('${escapeHtml(d)}')">
+            <span>📅 ${escapeHtml(d)} ${isToday ? '<small style="color:#10b981; font-weight:normal;">(Hoy)</small>' : ''}</span>
+            <span style="font-size:0.75rem; color:#94a3b8; font-family:monospace;">${count} movs</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function closeDiasModal() {
+      const backdrop = document.getElementById('diasModalBackdrop');
+      if (backdrop) backdrop.classList.remove('open');
+    }
+
+    function selectDayFromModal(dia) {
+      currentSelectedDay = dia;
+      closeDiasModal();
+      loadMovimientos();
+      showToast(`Mostrando movimientos del día ${dia}`);
     }
 
     function renderMiniHistory() {
@@ -1048,10 +1484,50 @@ create policy "Acceso publico total movimientos"
       }).join('');
     }
 
-    function updateKnownUsersDatalist() {
-      const users = [...new Set(currentMovimientos.map(m => m.usuario).filter(Boolean))];
+    async function updateKnownUsersDatalist() {
+      // 1. Obtener los del día actual cargado
+      const dayUsers = currentMovimientos.map(m => m.usuario).filter(Boolean);
+
+      // 2. Traer la lista global de usuarios únicos de Supabase para enriquecer las sugerencias
+      const userCounts = {};
+      dayUsers.forEach(u => {
+        const clean = u.trim();
+        userCounts[clean] = (userCounts[clean] || 0) + 2;
+      });
+
+      const { url, key, isConfigured } = getSupabaseCredentials();
+      if (isConfigured) {
+        try {
+          const res = await fetch(`${url}/rest/v1/${SUPABASE_TABLE}?select=usuario&borrado=eq.false&order=id.desc&limit=1000`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              data.forEach(r => {
+                const u = String(r.usuario || '').trim();
+                if (u) {
+                  userCounts[u] = (userCounts[u] || 0) + 1;
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Error al cargar lista global de usuarios:', e);
+        }
+      }
+
+      // Ordenar por popularidad (más usados primero)
+      allPredictiveUsers = Object.keys(userCounts).map(name => ({
+        name,
+        count: userCounts[name]
+      })).sort((a, b) => b.count - a.count);
+
+      // Mantener también el datalist nativo como fallback
       const dl = document.getElementById('knownUsersList');
-      if (dl) dl.innerHTML = users.map(u => `<option value="${escapeHtml(u)}"></option>`).join('');
+      if (dl) {
+        dl.innerHTML = allPredictiveUsers.slice(0, 50).map(u => `<option value="${escapeHtml(u.name)}"></option>`).join('');
+      }
     }
 
     function editMovimiento(id) {

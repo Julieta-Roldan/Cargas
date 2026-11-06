@@ -435,7 +435,7 @@ async function syncGoogleSheet(silent = false) {
 
 function syncGoogleSheetViaJsonp(sheetId, silent) {
   const statusEl = document.getElementById('gsheetStatusText');
-  window.__onGvizLoaded = function(json) {
+  window.__onGvizLoaded = function (json) {
     if (!json || !json.table || !json.table.rows) {
       if (statusEl) statusEl.textContent = '❌ No se pudo leer la hoja. Verifica que esté pública.';
       return;
@@ -516,7 +516,7 @@ function populateTimeAndRowSelectors(items = []) {
   items.forEach(it => {
     if (it.hora && /^\d{1,2}:\d{2}$/.test(it.hora.trim())) {
       const parts = it.hora.trim().split(':');
-      timeSet.add(`${ parts[0].padStart(2, '0') }:${ parts[1] }`);
+      timeSet.add(`${parts[0].padStart(2, '0')}:${parts[1]}`);
     }
   });
 
@@ -727,7 +727,7 @@ function handleExcelFile(file) {
   document.getElementById('dropzoneTitle').textContent = `Archivo cargado: ${file.name}`;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     const data = new Uint8Array(e.target.result);
     AppState.currentWorkbook = XLSX.read(data, { type: 'array' });
     AppState.userSetSheetRange = false;

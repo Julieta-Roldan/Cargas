@@ -625,6 +625,7 @@
         <strong>1 Clic</strong> selecciona la fila ·
         <kbd>↑</kbd> <kbd>↓</kbd> sube y baja ·
         <kbd>→</kbd> o <kbd>Espacio</kbd> marca/desmarca <strong>OK</strong> ·
+        <kbd>←</kbd> (Flecha Izquierda) <strong>corrige el usuario mal tipeado</strong> en Supabase ·
         Botón <kbd>▼</kbd> despliega todos los datos en la fila ·
         <strong>Doble Clic</strong> o <kbd>Enter</kbd> abre la comparación lado a lado.
       </div>
@@ -664,7 +665,8 @@
     <span class="nav-pos" id="navPosLabel">Fila 0 / 0</span>
     <button class="btn" onclick="moveSelection(1)" title="Bajar a la siguiente fila (Flecha Abajo)">⬇️ Siguiente</button>
     <div style="border-left: 1px solid var(--border); height: 22px;"></div>
-    <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK (Tecla Espacio)">☑️ Marcar OK</button>
+    <button class="btn btn-outline" onclick="quickFixSelectedUserName()" style="border-color: #818cf8; color: #c7d2fe;" title="Corregir nombre de usuario mal escrito en Supabase (Flecha Izquierda ←)">✏️ Corregir Usuario <kbd>←</kbd></button>
+    <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK (Tecla Espacio o Flecha Derecha →)">☑️ Marcar OK</button>
     <button class="btn btn-primary" onclick="openComparisonModalForSelected()" title="Ver detalle comparativo (Doble Clic o Enter)">🔍 Comparar</button>
   </div>
 
@@ -744,6 +746,7 @@
               <li><strong>1 Clic en una fila:</strong> La deja seleccionada (resaltada en azul).</li>
               <li><strong>Flechas <kbd>↑</kbd> y <kbd>↓</kbd>:</strong> Subes y bajas por la lista.</li>
               <li><strong>Flecha <kbd>→</kbd> o <kbd>Espacio</kbd>:</strong> Marca o desmarca el <code>OK</code> de la fila seleccionada.</li>
+              <li><strong>Flecha <kbd>←</kbd> (Izquierda):</strong> Corrige el nombre de usuario mal escrito en Supabase para todas sus cargas y sugerencias.</li>
               <li><strong>Botón <kbd>▼</kbd> (Drop):</strong> Despliega en el lugar todos los datos crudos de esa fila sin abrir ventanas.</li>
               <li><strong>Doble Clic o <kbd>Enter</kbd>:</strong> Abre la ventana comparativa enfrentando Panel vs Google Sheets y mostrando las filas vecinas.</li>
             </ul>
@@ -1451,10 +1454,10 @@
       if (chevron) chevron.textContent = isOpen ? '▶' : '▼';
     }
   </script>
-  <script src="js/parsers.js?v=20261106"></script>
-  <script src="js/matcher.js?v=20261106"></script>
-  <script src="js/ui.js?v=20261106"></script>
-  <script src="js/pdf.js?v=20261106"></script>
-  <script src="js/tour.js?v=20261106"></script>
+  <script src="js/parsers.js?v=20261106b"></script>
+  <script src="js/matcher.js?v=20261106b"></script>
+  <script src="js/ui.js?v=20261106b"></script>
+  <script src="js/pdf.js?v=20261106b"></script>
+  <script src="js/tour.js?v=20261106b"></script>
 </body>
 </html>
