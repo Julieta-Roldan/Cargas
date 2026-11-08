@@ -1196,7 +1196,7 @@
       }
     }
 
-    // Escuchar el tipeo secreto de +991
+    // Escuchar el tipeo secreto de +991 (para teclado físico en PC)
     document.addEventListener('keydown', (e) => {
       const isAuth = sessionStorage.getItem('admin_logged_in_user');
       if (isAuth) return;
@@ -1214,6 +1214,46 @@
           box.style.display = 'block';
           checkIfAnyUserExists();
         }
+      }
+    });
+
+    // Gesto táctil secreto para celular: 20 toques rápidos seguidos en cualquier parte de la pantalla negra
+    let secretTouchCount = 0;
+    let lastSecretTouchTime = 0;
+
+    function handleSecretTap(e) {
+      const isAuth = sessionStorage.getItem('admin_logged_in_user');
+      if (isAuth) return;
+
+      const box = document.getElementById('authBoxContainer');
+      const isBoxVisible = box && box.style.display === 'block';
+      if (isBoxVisible) return;
+      if (box && box.contains(e.target)) return;
+
+      const now = Date.now();
+      // Ventana de 700ms entre toque y toque para encadenar los 20 toques sin reseteo accidental
+      if (now - lastSecretTouchTime < 700) {
+        secretTouchCount++;
+      } else {
+        secretTouchCount = 1;
+      }
+      lastSecretTouchTime = now;
+
+      if (secretTouchCount >= 20) {
+        secretTouchCount = 0;
+        box.style.display = 'block';
+        checkIfAnyUserExists();
+        setTimeout(() => {
+          const uInput = document.getElementById('authUserInput');
+          if (uInput) uInput.focus();
+        }, 100);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const overlay = document.getElementById('adminAuthOverlay');
+      if (overlay) {
+        overlay.addEventListener('pointerup', handleSecretTap);
       }
     });
 
@@ -1717,10 +1757,10 @@
       }
     });
   </script>
-  <script src="js/parsers.js?v=20261107c"></script>
-  <script src="js/matcher.js?v=20261107c"></script>
-  <script src="js/ui.js?v=20261107c"></script>
-  <script src="js/pdf.js?v=20261107c"></script>
-  <script src="js/tour.js?v=20261107c"></script>
+  <script src="js/parsers.js?v=20261108"></script>
+  <script src="js/matcher.js?v=20261108"></script>
+  <script src="js/ui.js?v=20261108"></script>
+  <script src="js/pdf.js?v=20261108"></script>
+  <script src="js/tour.js?v=20261108"></script>
 </body>
 </html>
