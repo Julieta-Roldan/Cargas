@@ -34,7 +34,11 @@ const AppState = {
   selectedRowKey: null,
   expandedDrops: {}, // Filas con el "drop" inline abierto
   manualChecks: {},  // Mapa de verificaciones manuales (OK)
-  isModalOpen: false
+  isModalOpen: false,
+
+  // PAGINACIÓN Y OPTIMIZACIÓN (Carga rápida por lotes)
+  visibleLimit: 50,
+  pageSize: 50
 };
 
 // Formatea la referencia de fila incluyendo el nombre de la pestaña si hay varias hojas

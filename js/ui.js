@@ -246,7 +246,22 @@ function toggleCheck(key, checked, event) {
   }
   AppState.selectedRowKey = key;
   AppState.manualChecks[key] = checked;
-  renderTable();
+
+  const hideChecked = document.getElementById('hideCheckedToggle')?.checked;
+  if (hideChecked) {
+    renderTable(false);
+  } else {
+    // Optimización 10/10: Actualizar solo la fila y contadores al instante sin reconstruir el DOM
+    const tr = document.querySelector(`#resultsBody tr[data-key="${key}"]`);
+    if (tr) {
+      tr.classList.toggle('row-checked', checked);
+      const chks = tr.querySelectorAll('.ok-checkbox');
+      chks.forEach(c => { c.checked = checked; });
+    }
+    updateSummaryStats();
+    updateFloatingNav();
+  }
+
   if (AppState.isModalOpen && AppState.selectedRowKey === key) {
     renderComparisonModalContent();
   }
@@ -254,17 +269,15 @@ function toggleCheck(key, checked, event) {
 
 function toggleSelectedCheck() {
   if (!AppState.selectedRowKey) return;
-  AppState.manualChecks[AppState.selectedRowKey] = !AppState.manualChecks[AppState.selectedRowKey];
-  renderTable();
-  if (AppState.isModalOpen) {
-    renderComparisonModalContent();
-  }
+  const key = AppState.selectedRowKey;
+  const newChecked = !AppState.manualChecks[key];
+  toggleCheck(key, newChecked);
 }
 
 function toggleInlineDrop(key, event) {
   if (event) event.stopPropagation();
   AppState.expandedDrops[key] = !AppState.expandedDrops[key];
-  renderTable();
+  renderTable(false);
 }
 
 function expandAllInlineDrops(openState) {
@@ -466,6 +479,13 @@ function moveSelection(delta) {
   } else {
     idx = Math.max(0, Math.min(rows.length - 1, idx + delta));
   }
+
+  // Si al bajar con flechas llegamos cerca del límite visible, expandir 50 más automáticamente
+  if (delta > 0 && idx >= (AppState.visibleLimit || 50) - 2 && (AppState.visibleLimit || 50) < rows.length) {
+    AppState.visibleLimit = Math.min(rows.length, (AppState.visibleLimit || 50) + 50);
+    renderTable(false);
+  }
+
   selectRow(rows[idx].key, true);
 }
 
@@ -731,7 +751,10 @@ function renderComparisonModalContent() {
 // =========================================================
 // RENDERIZADO DE LA TABLA PRINCIPAL + DROPS POR FILA
 // =========================================================
-function renderTable() {
+function renderTable(resetLimit = true) {
+  if (resetLimit) {
+    AppState.visibleLimit = AppState.pageSize || 50;
+  }
   updateSummaryStats();
   const tbody = document.getElementById('resultsBody');
   const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
@@ -831,8 +854,10 @@ function renderTable() {
   }
 
   const htmlRows = [];
+  const limit = AppState.visibleLimit || 50;
+  const rowsToRender = filtered.slice(0, limit);
 
-  filtered.forEach(row => {
+  rowsToRender.forEach(row => {
     const isChecked = !!AppState.manualChecks[row.key];
     const isSelected = row.key === AppState.selectedRowKey;
     const isDropOpen = !!AppState.expandedDrops[row.key];
@@ -910,49 +935,50 @@ function renderTable() {
         ondblclick="onRowDblClick('${escapeHtml(row.key)}', event)"
         title="1 Clic: Seleccionar | Doble Clic: Ver Fila y Comparar"
       >
-        <!-- VISTA MÓVIL EN 2 COLUMNAS (EXACTA AL DIBUJO) -->
+        <!-- VISTA MÓVIL EN 2 COLUMNAS (ADAPTADO AL CELULAR SIN SCROLL HORIZONTAL) -->
         <td colspan="10" class="mobile-only-cell">
           <div class="mobile-row-wrapper">
-            <div class="mobile-row-main">
-              <!-- COLUMNA IZQUIERDA: USUARIO + HORARIO -->
-              <div class="mobile-col-left">
-                <div class="mobile-user-title">${userDisplay}</div>
-                <div class="mobile-sub-line">
-                  <span class="mobile-time-badge">${horarioText}</span>
-                  ${typeBadge}
-                  ${statusBadge}
-                </div>
-              </div>
-
-              <!-- COLUMNA DERECHA: PANEL MONTO + ANOTADO SUPABASE MONTO -->
-              <div class="mobile-col-right">
-                <div class="mobile-amount-line">
-                  <span class="mobile-amount-label">Panel:</span>
-                  <strong class="mobile-amount-val">${montoPanel}</strong>
-                </div>
-                <div class="mobile-amount-line">
-                  <span class="mobile-amount-label">Anotado:</span>
-                  <strong class="mobile-amount-val">${montoExcel}</strong>
-                </div>
+            <!-- COLUMNA IZQUIERDA: USUARIO + HORARIO + BADGES -->
+            <div class="mobile-col-left">
+              <div class="mobile-user-title">${userDisplay}</div>
+              <div class="mobile-sub-line">
+                <span class="mobile-time-badge">${horarioText}</span>
+                ${typeBadge}
+                ${statusBadge}
               </div>
             </div>
 
-            <!-- ACCIÓN RÁPIDA: CHECKBOX OK Y DESPLEGABLE -->
-            <div class="mobile-row-meta" onclick="event.stopPropagation()">
-              <input
-                type="checkbox"
-                class="ok-checkbox mobile-touch-checkbox"
-                ${isChecked ? 'checked' : ''}
-                onchange="toggleCheck('${escapeHtml(row.key)}', this.checked, event)"
-              />
-              <button
-                type="button"
-                class="btn-row-drop ${isDropOpen ? 'open' : ''}"
-                onclick="toggleInlineDrop('${escapeHtml(row.key)}', event)"
-                title="Desplegar datos"
-              >
-                ${isDropOpen ? '▲' : '▼'}
-              </button>
+            <!-- COLUMNA DERECHA: PANEL MONTO + ANOTADO SUPABASE + CHECKBOX + DROPDOWN -->
+            <div class="mobile-col-right">
+              <div class="mobile-amounts-wrap">
+                <div class="mobile-amount-line">
+                  <span class="mobile-amount-label">PANEL:</span>
+                  <strong class="mobile-amount-val">${montoPanel}</strong>
+                </div>
+                <div class="mobile-amount-line">
+                  <span class="mobile-amount-label">ANOTADO:</span>
+                  <strong class="mobile-amount-val">${montoExcel}</strong>
+                </div>
+              </div>
+
+              <!-- ACCIÓN RÁPIDA: CHECKBOX OK Y DESPLEGABLE -->
+              <div class="mobile-row-meta" onclick="event.stopPropagation()">
+                <input
+                  type="checkbox"
+                  class="ok-checkbox mobile-touch-checkbox"
+                  ${isChecked ? 'checked' : ''}
+                  onchange="toggleCheck('${escapeHtml(row.key)}', this.checked, event)"
+                  title="Marcar OK"
+                />
+                <button
+                  type="button"
+                  class="btn-row-drop ${isDropOpen ? 'open' : ''}"
+                  onclick="toggleInlineDrop('${escapeHtml(row.key)}', event)"
+                  title="Desplegar datos"
+                >
+                  ${isDropOpen ? '▲' : '▼'}
+                </button>
+              </div>
             </div>
           </div>
         </td>
@@ -1022,7 +1048,51 @@ function renderTable() {
     }
   });
 
+  if (filtered.length > rowsToRender.length) {
+    const remaining = filtered.length - rowsToRender.length;
+    const nextBatch = Math.min(50, remaining);
+    htmlRows.push(`
+      <tr class="pagination-row">
+        <td colspan="10">
+          <div class="pagination-box">
+            <div class="pagination-status">
+              Mostrando <strong>${rowsToRender.length}</strong> de <strong>${filtered.length}</strong> movimientos
+            </div>
+            <div class="pagination-btns">
+              <button type="button" class="btn btn-primary" onclick="loadMoreRows(${nextBatch})" style="font-weight: 800; background: #2563eb; border-color: #1d4ed8;">
+                ➕ Cargar ${nextBatch} más
+              </button>
+              <button type="button" class="btn btn-outline" onclick="loadAllRows()" style="border-color: #38bdf8; color: #7dd3fc; font-weight: 700;">
+                ⚡ Mostrar todos (${filtered.length})
+              </button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `);
+  }
+
   tbody.innerHTML = htmlRows.join('');
+}
+
+function loadMoreRows(count = 50) {
+  const total = AppState.currentVisibleRows ? AppState.currentVisibleRows.length : 0;
+  AppState.visibleLimit = Math.min(total, (AppState.visibleLimit || 50) + count);
+  renderTable(false);
+}
+
+function loadAllRows() {
+  const total = AppState.currentVisibleRows ? AppState.currentVisibleRows.length : 0;
+  AppState.visibleLimit = total;
+  renderTable(false);
+}
+
+let searchDebounceTimer = null;
+function onSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    renderTable(true);
+  }, 120);
 }
 
 // =========================================================

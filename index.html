@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <!-- Estilos separados -->
-  <link rel="stylesheet" href="css/styles.css?v=20261107b" />
+  <link rel="stylesheet" href="css/styles.css?v=20261108d" />
   <style>
     /* PANTALLA COMPLETAMENTE NEGRA Y LIMPIA (DOBLE CANDADO) */
     #adminAuthOverlay {
@@ -646,7 +646,7 @@
           type="text"
           id="searchInput"
           placeholder="🔎 Buscar usuario, monto, billetera, fila o ID..."
-          oninput="renderTable()"
+          oninput="onSearchInput()"
           style="min-width: 250px;"
         />
         <select id="sortOrderSelect" onchange="renderTable()" title="Orden de la tabla">
@@ -731,7 +731,7 @@
 
     <!-- TABLA PRINCIPAL DE RESULTADOS -->
     <div class="table-wrapper" id="tableSection">
-      <table>
+      <table class="results-table">
         <thead>
           <tr>
             <th style="width: 46px; text-align: center;">OK</th>
@@ -1839,10 +1839,10 @@
       }
     });
   </script>
-  <script src="js/parsers.js?v=20261108b"></script>
-  <script src="js/matcher.js?v=20261108b"></script>
-  <script src="js/ui.js?v=20261108b"></script>
-  <script src="js/pdf.js?v=20261108b"></script>
-  <script src="js/tour.js?v=20261108b"></script>
+  <script src="js/parsers.js?v=20261108d"></script>
+  <script src="js/matcher.js?v=20261108d"></script>
+  <script src="js/ui.js?v=20261108d"></script>
+  <script src="js/pdf.js?v=20261108d"></script>
+  <script src="js/tour.js?v=20261108d"></script>
 </body>
 </html>
