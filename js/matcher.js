@@ -349,7 +349,7 @@ function runComparison() {
     });
   });
 
-  assignEstimatedTimeForExcelOnly(results);
+  assignEstimatedTimeForExcelOnly(results, panelItems);
 
   AppState.comparisonResults = results;
   if (typeof renderDayAndShiftBars === 'function') {
@@ -359,7 +359,99 @@ function runComparison() {
   renderTable();
 }
 
-function assignEstimatedTimeForExcelOnly(results) {
+function assignPanelOrderForExcelOnly(results, panelItems) {
+  if (!panelItems || panelItems.length === 0) {
+    results.forEach((r, idx) => {
+      r.panelOrder = r.excel ? (r.excel.sheetIndex || 0) * 100000 + (r.excel.excelRowNumber || idx) : idx;
+    });
+    return;
+  }
+
+  // Detectar si el Panel viene en orden cronológico descendente (más reciente arriba) o ascendente
+  let descCount = 0;
+  let ascCount = 0;
+  for (let i = 0; i < panelItems.length - 1; i++) {
+    const diff = (panelItems[i].minutesOfDay ?? 0) - (panelItems[i + 1].minutesOfDay ?? 0);
+    if (diff > 0) descCount++;
+    else if (diff < 0) ascCount++;
+  }
+  const isDescending = descCount >= ascCount;
+
+  results.forEach(r => {
+    if (r.panel) {
+      r.panelOrder = (r.panel.panelIndex !== undefined) ? r.panel.panelIndex : 0;
+      return;
+    }
+
+    const eMins = r.sortMinutes ?? r.excel?.minutesOfDay ?? 0;
+    const rowOffset = ((r.excel?.excelRowNumber ?? 0) % 1000) * 0.0001;
+
+    let targetOrder = 0;
+    if (isDescending) {
+      // Panel descendente (más reciente arriba)
+      const firstMins = panelItems[0]?.minutesOfDay ?? 0;
+      const lastMins = panelItems[panelItems.length - 1]?.minutesOfDay ?? 0;
+
+      if (eMins > firstMins) {
+        targetOrder = -0.5;
+      } else if (eMins < lastMins) {
+        targetOrder = panelItems.length - 1 + 0.5;
+      } else {
+        let foundIdx = -1;
+        for (let i = 0; i < panelItems.length; i++) {
+          const pMins = panelItems[i].minutesOfDay ?? 0;
+          if (pMins <= eMins) {
+            foundIdx = i;
+            break;
+          }
+        }
+        if (foundIdx === -1) {
+          targetOrder = panelItems.length - 1 + 0.5;
+        } else {
+          const pMins = panelItems[foundIdx].minutesOfDay ?? 0;
+          if (pMins === eMins) {
+            targetOrder = foundIdx + 0.01;
+          } else {
+            targetOrder = foundIdx - 0.5;
+          }
+        }
+      }
+    } else {
+      // Panel ascendente (más temprano arriba)
+      const firstMins = panelItems[0]?.minutesOfDay ?? 0;
+      const lastMins = panelItems[panelItems.length - 1]?.minutesOfDay ?? 0;
+
+      if (eMins < firstMins) {
+        targetOrder = -0.5;
+      } else if (eMins > lastMins) {
+        targetOrder = panelItems.length - 1 + 0.5;
+      } else {
+        let foundIdx = -1;
+        for (let i = 0; i < panelItems.length; i++) {
+          const pMins = panelItems[i].minutesOfDay ?? 0;
+          if (pMins >= eMins) {
+            foundIdx = i;
+            break;
+          }
+        }
+        if (foundIdx === -1) {
+          targetOrder = panelItems.length - 1 + 0.5;
+        } else {
+          const pMins = panelItems[foundIdx].minutesOfDay ?? 0;
+          if (pMins === eMins) {
+            targetOrder = foundIdx + 0.01;
+          } else {
+            targetOrder = foundIdx - 0.5;
+          }
+        }
+      }
+    }
+
+    r.panelOrder = targetOrder + rowOffset;
+  });
+}
+
+function assignEstimatedTimeForExcelOnly(results, panelItems) {
   const knownPoints = [];
   results.forEach(r => {
     if (r.excel && r.panel && r.panel.minutesOfDay !== undefined) {
@@ -399,5 +491,8 @@ function assignEstimatedTimeForExcelOnly(results) {
       }
     }
   });
+
+  // Intercalar filas según el orden del Panel
+  assignPanelOrderForExcelOnly(results, panelItems);
 }
 

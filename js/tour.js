@@ -149,10 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const excelFileInput = document.getElementById('excelFileInput');
   const dropzone = document.getElementById('dropzone');
 
-  panelInput.addEventListener('input', () => {
-    parsePanelInput();
-    runComparison();
-  });
+  // El procesamiento del panel ahora se hace con el botón '⚡ Procesar y Comparar' para evitar que la página se congele al pegar
+  // panelInput.addEventListener('input', () => { ... });
 
   excelPasteInput.addEventListener('input', () => {
     if (AppState.excelMode === 'paste') {
@@ -187,48 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Conectar y sincronizar automáticamente la hoja de Google Sheets al abrir la app
   syncGoogleSheet(true);
 
-  // Atajos de teclado globales
+  // Atajo para salir del tour con Escape si está activo
   document.addEventListener('keydown', (e) => {
-    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-    const isTyping = (tag === 'textarea' || (tag === 'input' && e.target.type === 'text') || tag === 'select');
-
-    if (e.key === 'Escape') {
-      if (currentTourStep !== -1) {
-        endProductTour();
-        return;
-      }
-      if (AppState.isModalOpen) {
-        closeComparisonModal();
-        return;
-      }
-      if (typeof closePdfModal === 'function') closePdfModal();
-      closeHelpModal();
-      return;
-    }
-
-    if (isTyping) return;
-    if (AppState.currentVisibleRows.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      moveSelection(1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      moveSelection(-1);
-    } else if (e.key === 'ArrowRight' || e.key === ' ' || e.code === 'Space') {
-      if (AppState.selectedRowKey) {
-        e.preventDefault();
-        toggleSelectedCheck();
-      }
-    } else if (e.key === 'Enter') {
-      if (AppState.selectedRowKey) {
-        e.preventDefault();
-        if (AppState.isModalOpen) {
-          closeComparisonModal();
-        } else {
-          openComparisonModalForSelected();
-        }
-      }
+    if (e.key === 'Escape' && currentTourStep !== -1) {
+      endProductTour();
     }
   });
 });

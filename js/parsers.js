@@ -129,6 +129,7 @@ function extractPanelMovementsAndDebug(raw) {
     items.push({
       uid: `P_${idx}_${rec.id}`,
       id: rec.id,
+      panelIndex: items.length, // Índice secuencial exacto como viene en el Panel (0, 1, 2...)
       fecha: rec.fecha,
       fechaDia,
       timeStr: dt.timeStr,
@@ -286,9 +287,7 @@ function parsePanelInput() {
 
   updatePanelDebugUI(res, raw);
 
-  // Ordenar cronológicamente de 00:00 a 23:59
-  items.sort((a, b) => a.timestamp - b.timestamp || a.minutesOfDay - b.minutesOfDay);
-
+  // Mantenemos el orden original del Panel (como aparece en la página y se pega)
   AppState.panelItems = items;
 
   // Si el usuario acaba de pegar movimientos de un día específico y no bloqueó manualmente otro día, activar ese día
@@ -303,22 +302,57 @@ function parsePanelInput() {
   if (pill) pill.textContent = items.length;
 }
 
-// Auto-limpiar en el acto cuando el usuario pega toda la página con Ctrl+V (dejando solo las filas útiles en la caja)
+function processAndComparePanel() {
+  const panelInput = document.getElementById('panelInput');
+  const raw = panelInput ? panelInput.value.trim() : '';
+  if (!raw) {
+    showToast('⚠️ Primero pegá datos del Panel en la caja');
+    return;
+  }
+  const btn = document.getElementById('btnProcessPanel');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Procesando...';
+  }
+
+  setTimeout(() => {
+    try {
+      cleanPanelInputInPlace(false);
+      parsePanelInput();
+      runComparison();
+      showToast(`⚡ ${AppState.panelItems.length} movimientos procesados y comparados`);
+
+      // En celular, plegar la entrada de datos automáticamente para ver la lista directo
+      if (window.innerWidth <= 768) {
+        const drop = document.getElementById('dropInputs');
+        if (drop && !drop.classList.contains('collapsed')) {
+          toggleDropSection('dropInputs');
+        }
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Procesar y Comparar';
+      }
+    }
+  }, 20);
+}
+
+// Al pegar texto, no congelamos el navegador ejecutando cálculos pesados en cada pegada.
+// El usuario puede pegar todas las páginas que quiera y procesar con 1 clic en el botón.
 window.addEventListener('DOMContentLoaded', () => {
   const panelInput = document.getElementById('panelInput');
   if (panelInput) {
     panelInput.addEventListener('paste', () => {
       setTimeout(() => {
         const raw = panelInput.value;
-        const res = extractPanelMovementsAndDebug(raw);
-        if (res.items.length > 0 && (res.ignoredNoise.length > 0 || raw.split(/\r?\n/).length > res.items.length * 2)) {
-          const extra = res.unknownLines.length > 0 ? '\n' + res.unknownLines.join('\n') : '';
-          panelInput.value = res.cleanLines.join('\n') + extra;
-          parsePanelInput();
-          updatePanelDebugUI(res, raw); // Mantener el conteo de cuánta basura se acaba de filtrar en el aviso
-          runComparison();
+        const lineCount = (raw.match(/\n/g) || []).length + 1;
+        const badge = document.getElementById('panelCountBadge');
+        if (badge) {
+          badge.textContent = `${lineCount} líneas pegadas (listo para procesar)`;
+          badge.style.color = '#38bdf8';
         }
-      }, 30);
+      }, 50);
     });
   }
 });
@@ -1012,18 +1046,35 @@ function extractItemsFromSheetRows(rows, opts = {}) {
 // =========================================================
 function syncActiveWorkerSource(silent = false) {
   if (AppState.excelMode === 'supabase') {
-    syncSupabaseMovimientos(silent);
+    if (typeof openDaySelectorSyncModal === 'function') {
+      openDaySelectorSyncModal();
+    } else {
+      syncSupabaseMovimientos(silent);
+    }
   } else {
     syncGoogleSheet(silent);
   }
 }
 
-async function syncSupabaseMovimientos(silent = false) {
+function clearPanelInputOnly() {
+  const panelInput = document.getElementById('panelInput');
+  if (panelInput) panelInput.value = '';
+  AppState.panelItems = [];
+  const badge = document.getElementById('panelCountBadge');
+  if (badge) badge.textContent = '0 movimientos';
+  const pill = document.getElementById('pillPanelCount');
+  if (pill) pill.textContent = '0';
+  runComparison();
+  showToast('🗑️ Panel vaciado');
+}
+
+async function syncSupabaseMovimientos(silent = false, requestedDay = null) {
   const statusEl = document.getElementById('supabaseVerifierStatus');
   if (statusEl) statusEl.textContent = '⏳ Trayendo movimientos de trabajadoras...';
 
   try {
-    const res = await fetchMovimientosFromDB('all');
+    const dayFilter = (requestedDay && requestedDay !== 'all') ? requestedDay : 'all';
+    const res = await fetchMovimientosFromDB(dayFilter);
     // Ordenar en orden cronológico ascendente (del primero del día al último) para que el motor de horarios cruce exacto
     const list = [...(res.data || [])].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
 
@@ -1068,15 +1119,22 @@ async function syncSupabaseMovimientos(silent = false) {
     const pill = document.getElementById('pillExcelCount');
     if (pill) pill.textContent = parsed.length;
 
+    if (requestedDay && requestedDay !== 'all') {
+      AppState.selectedDay = requestedDay;
+      AppState.userLockedDay = true;
+    }
+
     runComparison();
 
     const timeStr = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     if (statusEl) {
       const originLabel = res.source === 'supabase' ? '🟢 Conectado a Supabase' : '🟡 Leído desde Memoria Local';
-      statusEl.innerHTML = `${originLabel} · Actualizado: <strong>${timeStr}</strong> (${parsed.length} movimientos)`;
+      const daySuffix = (requestedDay && requestedDay !== 'all') ? ` (Día ${requestedDay})` : '';
+      statusEl.innerHTML = `${originLabel} · Actualizado: <strong>${timeStr}</strong> (${parsed.length} movs${daySuffix})`;
     }
     if (!silent) {
-      showToast(`☁️ Datos de trabajadoras sincronizados (${parsed.length} movimientos)`);
+      const dayNotice = (requestedDay && requestedDay !== 'all') ? ` del día ${requestedDay}` : '';
+      showToast(`☁️ Datos sincronizados: ${parsed.length} movimiento(s)${dayNotice}`);
     }
   } catch (err) {
     if (statusEl) {

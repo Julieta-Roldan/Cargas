@@ -381,9 +381,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Si la pantalla de login con +991 está activa y aún no se logueó, no interferir
     if (!sessionStorage.getItem('admin_logged_in_user')) return;
 
-    // Si el foco está en un campo de texto, no interceptar las flechas
-    const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-    if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+    // Si el foco está en un campo de texto donde se escribe, no interceptar las flechas
+    const activeEl = document.activeElement;
+    const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
+    const isTextInput = activeTag === 'textarea' ||
+                        (activeTag === 'input' && activeEl.type !== 'checkbox' && activeEl.type !== 'radio' && activeEl.type !== 'button') ||
+                        activeTag === 'select';
+    if (isTextInput) {
       return;
     }
 
@@ -772,13 +776,24 @@ function renderTable() {
   });
 
   filtered.sort((a, b) => {
+    if (sortOrder === 'panel_order' || !sortOrder) {
+      const orderA = a.panelOrder ?? 999999;
+      const orderB = b.panelOrder ?? 999999;
+      if (Math.abs(orderA - orderB) > 0.00001) return orderA - orderB;
+      // Si coinciden en el orden estimado: el del Panel siempre va primero
+      if (a.panel && !b.panel) return -1;
+      if (!a.panel && b.panel) return 1;
+      return (a.excel?.excelRowNumber ?? 0) - (b.excel?.excelRowNumber ?? 0);
+    }
     if (sortOrder === 'time_asc') {
       return (a.sortMinutes ?? 0) - (b.sortMinutes ?? 0) ||
+             (a.panel && !b.panel ? -1 : (!a.panel && b.panel ? 1 : 0)) ||
              ((a.excel?.sheetIndex ?? 0) - (b.excel?.sheetIndex ?? 0)) ||
              ((a.excel?.excelRowNumber ?? 9999) - (b.excel?.excelRowNumber ?? 9999));
     }
     if (sortOrder === 'time_desc') {
       return (b.sortMinutes ?? 0) - (a.sortMinutes ?? 0) ||
+             (a.panel && !b.panel ? -1 : (!a.panel && b.panel ? 1 : 0)) ||
              ((b.excel?.sheetIndex ?? 0) - (a.excel?.sheetIndex ?? 0)) ||
              ((b.excel?.excelRowNumber ?? 0) - (a.excel?.excelRowNumber ?? 0));
     }
@@ -789,7 +804,7 @@ function renderTable() {
     }
     if (sortOrder === 'status') {
       const priority = { only_panel: 1, only_excel: 2, diff: 3, similar: 4, matched: 5 };
-      return (priority[a.status] - priority[b.status]) || ((a.sortMinutes ?? 0) - (b.sortMinutes ?? 0));
+      return (priority[a.status] - priority[b.status]) || ((a.panelOrder ?? 0) - (b.panelOrder ?? 0));
     }
     return 0;
   });
@@ -855,12 +870,12 @@ function renderTable() {
     let userDisplay = '';
     if (row.panel && row.excel) {
       if (row.panel.usuarioNorm === row.excel.usuarioNorm) {
-        userDisplay = `<span class="${userClass}">${escapeHtml(row.excel.usuarioOriginal)}</span>`;
+        userDisplay = `<span class="${userClass}">${escapeHtml(row.panel.usuarioOriginal || row.excel.usuarioOriginal)}</span>`;
       } else {
         userDisplay = `
           <div class="user-pair">
-            <div><span class="${userClass}">${escapeHtml(row.excel.usuarioOriginal)}</span> <span class="user-sub">(Sheets)</span></div>
-            <div class="user-panel-tag">↔ Panel: <span class="mono">${escapeHtml(row.panel.usuarioOriginal)}</span></div>
+            <div><span class="${userClass}">${escapeHtml(row.panel.usuarioOriginal)}</span> <span class="user-sub">(Panel)</span></div>
+            <div class="user-panel-tag">↔ Sheets: <span class="mono">${escapeHtml(row.excel.usuarioOriginal)}</span></div>
           </div>
         `;
       }
@@ -893,9 +908,57 @@ function renderTable() {
         data-key="${escapeHtml(row.key)}"
         onclick="onRowClick('${escapeHtml(row.key)}', event)"
         ondblclick="onRowDblClick('${escapeHtml(row.key)}', event)"
-        title="1 Clic: Seleccionar | Doble Clic: Ver Fila de Sheets y Comparar"
+        title="1 Clic: Seleccionar | Doble Clic: Ver Fila y Comparar"
       >
-        <td style="text-align: center;">
+        <!-- VISTA MÓVIL EN 2 COLUMNAS (EXACTA AL DIBUJO) -->
+        <td colspan="10" class="mobile-only-cell">
+          <div class="mobile-row-wrapper">
+            <div class="mobile-row-main">
+              <!-- COLUMNA IZQUIERDA: USUARIO + HORARIO -->
+              <div class="mobile-col-left">
+                <div class="mobile-user-title">${userDisplay}</div>
+                <div class="mobile-sub-line">
+                  <span class="mobile-time-badge">${horarioText}</span>
+                  ${typeBadge}
+                  ${statusBadge}
+                </div>
+              </div>
+
+              <!-- COLUMNA DERECHA: PANEL MONTO + ANOTADO SUPABASE MONTO -->
+              <div class="mobile-col-right">
+                <div class="mobile-amount-line">
+                  <span class="mobile-amount-label">Panel:</span>
+                  <strong class="mobile-amount-val">${montoPanel}</strong>
+                </div>
+                <div class="mobile-amount-line">
+                  <span class="mobile-amount-label">Anotado:</span>
+                  <strong class="mobile-amount-val">${montoExcel}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- ACCIÓN RÁPIDA: CHECKBOX OK Y DESPLEGABLE -->
+            <div class="mobile-row-meta" onclick="event.stopPropagation()">
+              <input
+                type="checkbox"
+                class="ok-checkbox mobile-touch-checkbox"
+                ${isChecked ? 'checked' : ''}
+                onchange="toggleCheck('${escapeHtml(row.key)}', this.checked, event)"
+              />
+              <button
+                type="button"
+                class="btn-row-drop ${isDropOpen ? 'open' : ''}"
+                onclick="toggleInlineDrop('${escapeHtml(row.key)}', event)"
+                title="Desplegar datos"
+              >
+                ${isDropOpen ? '▲' : '▼'}
+              </button>
+            </div>
+          </div>
+        </td>
+
+        <!-- VISTA ESCRITORIO (10 COLUMNAS) -->
+        <td class="desktop-col" style="text-align: center;">
           <input
             type="checkbox"
             class="ok-checkbox"
@@ -903,7 +966,7 @@ function renderTable() {
             onchange="toggleCheck('${escapeHtml(row.key)}', this.checked, event)"
           />
         </td>
-        <td style="text-align: center;">
+        <td class="desktop-col" style="text-align: center;">
           <button
             class="btn-row-drop ${isDropOpen ? 'open' : ''}"
             onclick="toggleInlineDrop('${escapeHtml(row.key)}', event)"
@@ -912,14 +975,14 @@ function renderTable() {
             ${isDropOpen ? '▲' : '▼'}
           </button>
         </td>
-        <td class="mono" style="white-space: nowrap; font-size: 0.92rem;">${horarioText}</td>
-        <td class="cell-user">${userDisplay}</td>
-        <td class="amount amount-highlight">${montoPanel}</td>
-        <td class="amount amount-highlight">${montoExcel}</td>
-        <td>${statusBadge}</td>
-        <td>${typeBadge}</td>
-        <td class="amount">${diffText}</td>
-        <td style="font-size: 0.81rem; color: var(--text-muted); white-space: nowrap;">${infoPanel}</td>
+        <td class="desktop-col mono" style="white-space: nowrap; font-size: 0.92rem;">${horarioText}</td>
+        <td class="desktop-col cell-user">${userDisplay}</td>
+        <td class="desktop-col amount amount-highlight">${montoPanel}</td>
+        <td class="desktop-col amount amount-highlight">${montoExcel}</td>
+        <td class="desktop-col">${statusBadge}</td>
+        <td class="desktop-col">${typeBadge}</td>
+        <td class="desktop-col amount">${diffText}</td>
+        <td class="desktop-col" style="font-size: 0.81rem; color: var(--text-muted); white-space: nowrap;">${infoPanel}</td>
       </tr>
     `);
 
