@@ -98,8 +98,40 @@
   </style>
 </head>
 <body>
-  <!-- BLOQUEO CIEGO: Fondo negro. Al tipear +991 aparece el segundo candado (login/registro con Supabase) -->
+  <!-- BLOQUEO CIEGO: Fondo negro. Al dar 20 toques (celular) o tipear +991 (PC) aparece el código y luego el login -->
   <div id="adminAuthOverlay">
+    <!-- 1er PASO: CAJA DE CÓDIGO (TRAS 20 TOQUES EN CELULAR) -->
+    <div class="auth-box" id="pinBoxContainer" style="display: none; max-width: 340px;">
+      <div class="auth-box-title">🔒 Código de Seguridad</div>
+      <div class="auth-box-sub">Ingresá el código para desbloquear</div>
+
+      <form id="pinForm" onsubmit="handlePinSubmit(event)">
+        <div class="auth-field">
+          <input
+            type="password"
+            id="secretPinInput"
+            class="auth-input-txt"
+            placeholder="Ingresá el código..."
+            required
+            autocomplete="off"
+            style="text-align: center; font-size: 1.2rem; letter-spacing: 2px;"
+          />
+        </div>
+        <button type="submit" class="auth-btn-action" style="background: #10b981; border-color: #059669;">
+          Continuar
+        </button>
+      </form>
+
+      <div id="pinErrMsg" class="auth-err"></div>
+
+      <div style="margin-top: 12px;">
+        <button type="button" onclick="cancelPinPrompt()" style="background: transparent; border: none; color: #64748b; font-size: 0.8rem; cursor: pointer;">
+          Cancelar
+        </button>
+      </div>
+    </div>
+
+    <!-- 2do PASO: LOGIN NORMAL (USUARIO Y CONTRASEÑA SUPABASE) -->
     <div class="auth-box" id="authBoxContainer" style="display: none;">
       <div class="auth-box-title" id="authBoxTitle">Iniciar Sesión</div>
       <div class="auth-box-sub" id="authBoxSub">Ingresá tus credenciales registradas</div>
@@ -1187,12 +1219,14 @@
       const isAuth = sessionStorage.getItem('admin_logged_in_user');
       const overlay = document.getElementById('adminAuthOverlay');
       const box = document.getElementById('authBoxContainer');
+      const pinBox = document.getElementById('pinBoxContainer');
 
       if (isAuth) {
         if (overlay) overlay.style.display = 'none';
       } else {
         if (overlay) overlay.style.display = 'flex';
-        if (box) box.style.display = 'none'; // Ciego hasta poner +991
+        if (box) box.style.display = 'none';
+        if (pinBox) pinBox.style.display = 'none';
       }
     }
 
@@ -1202,10 +1236,12 @@
       if (isAuth) return;
 
       const box = document.getElementById('authBoxContainer');
+      const pinBox = document.getElementById('pinBoxContainer');
       const isBoxVisible = box && box.style.display === 'block';
+      const isPinVisible = pinBox && pinBox.style.display === 'block';
 
-      // Si el formulario ya está visible, no interceptar las teclas para que pueda escribir su contraseña
-      if (isBoxVisible) return;
+      // Si algún formulario ya está visible, no interceptar las teclas para que pueda escribir
+      if (isBoxVisible || isPinVisible) return;
 
       if (e.key && e.key.length === 1) {
         blindBuffer = (blindBuffer + e.key.toLowerCase()).slice(-4);
@@ -1226,9 +1262,13 @@
       if (isAuth) return;
 
       const box = document.getElementById('authBoxContainer');
+      const pinBox = document.getElementById('pinBoxContainer');
       const isBoxVisible = box && box.style.display === 'block';
-      if (isBoxVisible) return;
+      const isPinVisible = pinBox && pinBox.style.display === 'block';
+
+      if (isBoxVisible || isPinVisible) return;
       if (box && box.contains(e.target)) return;
+      if (pinBox && pinBox.contains(e.target)) return;
 
       const now = Date.now();
       // Ventana de 700ms entre toque y toque para encadenar los 20 toques sin reseteo accidental
@@ -1241,13 +1281,55 @@
 
       if (secretTouchCount >= 20) {
         secretTouchCount = 0;
-        box.style.display = 'block';
+        if (pinBox) {
+          pinBox.style.display = 'block';
+          const pinInp = document.getElementById('secretPinInput');
+          const pinErr = document.getElementById('pinErrMsg');
+          if (pinErr) pinErr.style.display = 'none';
+          if (pinInp) {
+            pinInp.value = '';
+            setTimeout(() => pinInp.focus(), 100);
+          }
+        }
+      }
+    }
+
+    function handlePinSubmit(e) {
+      e.preventDefault();
+      const pinInp = document.getElementById('secretPinInput');
+      const pinVal = (pinInp ? pinInp.value : '').trim();
+      const pinErr = document.getElementById('pinErrMsg');
+
+      if (pinVal === '+991' || pinVal === '991') {
+        const pinBox = document.getElementById('pinBoxContainer');
+        const authBox = document.getElementById('authBoxContainer');
+        if (pinBox) pinBox.style.display = 'none';
+        if (authBox) authBox.style.display = 'block';
         checkIfAnyUserExists();
         setTimeout(() => {
           const uInput = document.getElementById('authUserInput');
           if (uInput) uInput.focus();
         }, 100);
+      } else {
+        if (pinErr) {
+          pinErr.style.display = 'block';
+          pinErr.textContent = '❌ Código incorrecto';
+        }
+        if (pinInp) {
+          pinInp.value = '';
+          pinInp.focus();
+        }
       }
+    }
+
+    function cancelPinPrompt() {
+      const pinBox = document.getElementById('pinBoxContainer');
+      if (pinBox) pinBox.style.display = 'none';
+      const pinErr = document.getElementById('pinErrMsg');
+      if (pinErr) pinErr.style.display = 'none';
+      const pinInp = document.getElementById('secretPinInput');
+      if (pinInp) pinInp.value = '';
+      secretTouchCount = 0;
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -1757,10 +1839,10 @@
       }
     });
   </script>
-  <script src="js/parsers.js?v=20261108"></script>
-  <script src="js/matcher.js?v=20261108"></script>
-  <script src="js/ui.js?v=20261108"></script>
-  <script src="js/pdf.js?v=20261108"></script>
-  <script src="js/tour.js?v=20261108"></script>
+  <script src="js/parsers.js?v=20261108b"></script>
+  <script src="js/matcher.js?v=20261108b"></script>
+  <script src="js/ui.js?v=20261108b"></script>
+  <script src="js/pdf.js?v=20261108b"></script>
+  <script src="js/tour.js?v=20261108b"></script>
 </body>
 </html>
