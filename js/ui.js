@@ -387,6 +387,64 @@ async function quickFixSelectedUserName() {
 }
 
 // =========================================================
+// COPIAR LÍNEA FORMATEADA DEL PANEL (TECLA C / BOTÓN EN MODAL)
+// Formato: "HH:mm\tDD/MM/YYYY\tusuario\tmonto\tCarga (Depósito) / Retiro"
+// =========================================================
+function formatPanelLineForCopy(p) {
+  if (!p) return '';
+  const horario = p.timeStr || '';
+  const fechaSolo = String(p.fecha || '').trim().split(/\s+/)[0] || '';
+  const usuario = p.usuarioOriginal || '';
+  const monto = p.monto ?? 0;
+  const tipoLabel = p.tipo === 'RETIRO' ? 'Retiro' : 'Carga (Depósito)';
+  return `${horario}\t${fechaSolo}\t${usuario}\t${monto}\t${tipoLabel}`;
+}
+
+function copyTextToClipboardWithFallback(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) resolve();
+      else reject(new Error('execCommand copy failed'));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function copyPanelLineByKey(key) {
+  const row = AppState.comparisonResults.find(r => r.key === key);
+  if (!row || !row.panel) {
+    showToast('⚠️ Esta fila no tiene datos del Panel para copiar');
+    return;
+  }
+  const formatted = formatPanelLineForCopy(row.panel);
+  copyTextToClipboardWithFallback(formatted).then(() => {
+    showToast(`📋 Línea copiada: ${row.panel.timeStr} · ${row.panel.usuarioOriginal} · ${formatMoney(row.panel.monto)}`);
+  }).catch(() => {
+    showToast('❌ No se pudo copiar al portapapeles');
+  });
+}
+
+function copySelectedPanelLine() {
+  if (!AppState.selectedRowKey) {
+    showToast('⚠️ Seleccioná una fila primero');
+    return;
+  }
+  copyPanelLineByKey(AppState.selectedRowKey);
+}
+
+// =========================================================
 // ATAJOS DE TECLADO GLOBALES EN EL PANEL (FLECHAS, ESPACIO, ENTER, ETC)
 // =========================================================
 window.addEventListener('DOMContentLoaded', () => {
@@ -429,6 +487,13 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       quickFixSelectedUserName();
+      return;
+    }
+
+    // Tecla C (sin Ctrl/Meta/Alt): Copiar línea formateada del Panel
+    if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      copySelectedPanelLine();
       return;
     }
 
@@ -566,6 +631,11 @@ function renderComparisonModalContent() {
   okBtn.textContent = isChecked ? '✅ Marcado como OK (Clic para quitar)' : '☑️ Marcar como OK (Espacio)';
   okBtn.className = isChecked ? 'btn btn-primary' : 'btn btn-success';
 
+  const copyBtn = document.getElementById('modalCopyLineBtn');
+  if (copyBtn) {
+    copyBtn.style.display = row.panel ? 'inline-flex' : 'none';
+  }
+
   const p = row.panel;
   const e = row.excel;
 
@@ -574,6 +644,8 @@ function renderComparisonModalContent() {
     const diff = p.monto - e.monto;
     if (Math.abs(diff) < 0.01) {
       diffHtml = '<span style="color: var(--success); font-weight: 700;">$ 0 (Montos idénticos)</span>';
+    } else if (diff > 0 && diff <= 300) {
+      diffHtml = `<span style="color: var(--success); font-weight: 700;">+${formatMoney(diff)} (Tolerancia Panel ≤ $300)</span>`;
     } else {
       diffHtml = `<span style="color: var(--warning); font-weight: 700;">${diff > 0 ? '+' : ''}${formatMoney(diff)}</span>`;
     }
@@ -1020,7 +1092,13 @@ function renderTable(resetLimit = true) {
           <td colspan="10">
             <div class="inline-drop-grid">
               <div class="inline-drop-card">
-                <h5>🖥️ Datos Completos del Panel Administrativo</h5>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                  <h5 style="margin: 0; border: none; padding: 0;">🖥️ Datos Completos del Panel Administrativo</h5>
+                  ${p ? `
+                  <button type="button" class="btn btn-primary" onclick="event.stopPropagation(); copyPanelLineByKey('${escapeHtml(row.key)}')" style="padding: 2px 8px; font-size: 0.72rem;" title="Copiar línea formateada (Tecla C)">
+                    📋 Copiar línea
+                  </button>` : ''}
+                </div>
                 ${p ? `
                   <div class="inline-kv"><span>Nro / ID:</span> <strong class="mono">${escapeHtml(p.id)}</strong></div>
                   <div class="inline-kv"><span>Fecha y Hora:</span> <strong class="mono">${escapeHtml(p.fecha)}</strong></div>

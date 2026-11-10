@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <!-- Estilos separados -->
-  <link rel="stylesheet" href="css/styles.css?v=20261108d" />
+  <link rel="stylesheet" href="css/styles.css?v=20261110" />
   <style>
     /* PANTALLA COMPLETAMENTE NEGRA Y LIMPIA (DOBLE CANDADO) */
     #adminAuthOverlay {
@@ -724,6 +724,7 @@
         <kbd>↑</kbd> <kbd>↓</kbd> sube y baja ·
         <kbd>→</kbd> o <kbd>Espacio</kbd> marca/desmarca <strong>OK</strong> ·
         <kbd>←</kbd> (Flecha Izquierda) <strong>corrige el usuario mal tipeado</strong> en Supabase ·
+        <kbd>C</kbd> <strong>copia la línea</strong> del Panel formateada ·
         Botón <kbd>▼</kbd> despliega todos los datos en la fila ·
         <strong>Doble Clic</strong> o <kbd>Enter</kbd> abre la comparación lado a lado.
       </div>
@@ -764,6 +765,7 @@
     <button class="btn" onclick="moveSelection(1)" title="Bajar a la siguiente fila (Flecha Abajo)">⬇️ Siguiente</button>
     <div style="border-left: 1px solid var(--border); height: 22px;"></div>
     <button class="btn btn-outline" onclick="quickFixSelectedUserName()" style="border-color: #818cf8; color: #c7d2fe;" title="Corregir nombre de usuario mal escrito en Supabase (Flecha Izquierda ←)">✏️ Corregir Usuario <kbd>←</kbd></button>
+    <button class="btn btn-outline" onclick="copySelectedPanelLine()" style="border-color: #38bdf8; color: #7dd3fc;" title="Copiar línea formateada del Panel (Tecla C)">📋 Copiar línea <kbd>C</kbd></button>
     <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK (Tecla Espacio o Flecha Derecha →)">☑️ Marcar OK</button>
     <button class="btn btn-primary" onclick="openComparisonModalForSelected()" title="Ver detalle comparativo (Doble Clic o Enter)">🔍 Comparar</button>
   </div>
@@ -787,9 +789,10 @@
 
       <div class="modal-footer">
         <div style="font-size: 0.82rem; color: var(--text-muted);">
-          Usa las flechas <kbd>↑</kbd> <kbd>↓</kbd> para recorrer los movimientos sin cerrar esta ventana, y <kbd>→</kbd> o <kbd>Espacio</kbd> para marcar OK.
+          Usa <kbd>↑</kbd> <kbd>↓</kbd> para recorrer movimientos, <kbd>→</kbd> o <kbd>Espacio</kbd> para OK, y <kbd>C</kbd> para copiar la línea del Panel.
         </div>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-primary" id="modalCopyLineBtn" onclick="copySelectedPanelLine()" title="Copiar línea del Panel formateada (Tecla C)">📋 Copiar línea <kbd>C</kbd></button>
           <button class="btn btn-success" id="modalToggleOkBtn" onclick="toggleSelectedCheck()">☑️ Marcar como OK</button>
         </div>
       </div>
@@ -1839,10 +1842,10 @@
       }
     });
   </script>
-  <script src="js/parsers.js?v=20261108d"></script>
-  <script src="js/matcher.js?v=20261108d"></script>
-  <script src="js/ui.js?v=20261108d"></script>
-  <script src="js/pdf.js?v=20261108d"></script>
-  <script src="js/tour.js?v=20261108d"></script>
+  <script src="js/parsers.js?v=20261110"></script>
+  <script src="js/matcher.js?v=20261110"></script>
+  <script src="js/ui.js?v=20261110"></script>
+  <script src="js/pdf.js?v=20261110"></script>
+  <script src="js/tour.js?v=20261110"></script>
 </body>
 </html>

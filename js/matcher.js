@@ -287,6 +287,81 @@ function runComparison() {
     }
   });
 
+  // PASO 3B: Tolerancia de hasta +$300 DESDE EL PANEL (ej: Panel $15.001 vs Anotado $15.000)
+  // Solo aplica cuando el Panel tiene hasta $300 DE MÁS respecto a lo anotado (no si falta plata en el Panel).
+  const isPanelExtraWithin300 = (pMonto, eMonto) => {
+    const diff = pMonto - eMonto;
+    return diff > 0.009 && diff <= 300.009;
+  };
+
+  // 3B-1: Usuario exacto + diferencia de hasta +$300 desde el Panel
+  const tolExactPairs = [];
+  excelItems.forEach((eItem) => {
+    if (usedExcel.has(eItem.uid)) return;
+    panelItems.forEach((pItem) => {
+      if (usedPanel.has(pItem.uid)) return;
+      if (pItem.tipo !== eItem.tipo) return;
+      if (!sameDayOrUnknown(pItem, eItem)) return;
+      if (pItem.usuarioNorm === eItem.usuarioNorm && isPanelExtraWithin300(pItem.monto, eItem.monto)) {
+        const timeDiff = getTimeDiffMinutes(pItem, eItem);
+        const maxAllowed = (eItem.minutesOfDay !== null && eItem.minutesOfDay !== undefined) ? 60 : 180;
+        if (timeDiff <= maxAllowed) {
+          tolExactPairs.push({ eItem, pItem, timeDiff, amountDiff: pItem.monto - eItem.monto });
+        }
+      }
+    });
+  });
+  tolExactPairs.sort((a, b) => a.timeDiff - b.timeDiff || a.amountDiff - b.amountDiff);
+  tolExactPairs.forEach(({ eItem, pItem }) => {
+    if (usedExcel.has(eItem.uid) || usedPanel.has(pItem.uid)) return;
+    usedPanel.add(pItem.uid);
+    usedExcel.add(eItem.uid);
+    results.push({
+      key: eItem.uid,
+      status: 'matched',
+      matchNote: '',
+      tipo: eItem.tipo,
+      panel: pItem,
+      excel: eItem
+    });
+  });
+
+  // 3B-2: Usuario similar + diferencia de hasta +$300 desde el Panel
+  const tolSimilarPairs = [];
+  excelItems.forEach((eItem) => {
+    if (usedExcel.has(eItem.uid)) return;
+    panelItems.forEach((pItem) => {
+      if (usedPanel.has(pItem.uid)) return;
+      if (pItem.tipo !== eItem.tipo) return;
+      if (!sameDayOrUnknown(pItem, eItem)) return;
+      if (!isPanelExtraWithin300(pItem.monto, eItem.monto)) return;
+
+      const sim = userSimilarity(eItem.usuarioOriginal, pItem.usuarioOriginal);
+      const timeDiff = getTimeDiffMinutes(pItem, eItem);
+      const maxAllowed = (eItem.minutesOfDay !== null && eItem.minutesOfDay !== undefined) ? 60 : 180;
+
+      if (sim >= 0.72 && timeDiff <= maxAllowed) {
+        const score = sim - (timeDiff / 180) * 0.25 - ((pItem.monto - eItem.monto) / 300) * 0.05;
+        tolSimilarPairs.push({ eItem, pItem, score });
+      }
+    });
+  });
+  tolSimilarPairs.sort((a, b) => b.score - a.score);
+  tolSimilarPairs.forEach(({ eItem, pItem }) => {
+    if (usedExcel.has(eItem.uid) || usedPanel.has(pItem.uid)) return;
+    usedPanel.add(pItem.uid);
+    usedExcel.add(eItem.uid);
+    const isExactAfterNorm = pItem.usuarioNorm === eItem.usuarioNorm;
+    results.push({
+      key: eItem.uid,
+      status: isExactAfterNorm ? 'matched' : 'similar',
+      matchNote: isExactAfterNorm ? '' : 'Usuario escrito distinto',
+      tipo: eItem.tipo,
+      panel: pItem,
+      excel: eItem
+    });
+  });
+
   // PASO 4: Mismo usuario, pero MONTO DIFERENTE (solo si están cerca en horario)
   excelItems.forEach((eItem) => {
     if (usedExcel.has(eItem.uid)) return;
