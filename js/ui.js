@@ -38,7 +38,12 @@ function setExcelMode(mode) {
   document.getElementById('excelPasteContainer').style.display = mode === 'paste' ? 'block' : 'none';
 
   if (mode === 'supabase') {
-    syncSupabaseMovimientos(false);
+    // Abrir modal previo para que el usuario elija qué día traer en vez de descargar todo ciegamente
+    if (typeof openDaySelectorSyncModal === 'function') {
+      openDaySelectorSyncModal();
+    } else {
+      syncSupabaseMovimientos(false);
+    }
   } else if (mode === 'gsheet') {
     syncGoogleSheet(true);
   } else if (mode === 'paste') {
@@ -70,6 +75,7 @@ function renderDayAndShiftBars() {
   const shiftContainer = document.getElementById('shiftButtonsContainer');
   const shiftRowWrap = document.getElementById('shiftSelectorRow');
   const activeDayBadge = document.getElementById('activeDayHeaderBadge');
+  const btnListModal = document.getElementById('btnOpenDaysListModal');
 
   const days = getAvailableDays();
   const activeDay = getResolvedActiveDay();
@@ -78,12 +84,24 @@ function renderDayAndShiftBars() {
     activeDayBadge.textContent = activeDay === 'all' ? 'Todos los días' : `Día ${activeDay}`;
   }
 
+  if (btnListModal) {
+    if (days.length > 0) {
+      btnListModal.style.display = 'inline-flex';
+      btnListModal.textContent = `🗓️ Lista (${days.length})`;
+    } else {
+      btnListModal.style.display = 'none';
+    }
+  }
+
   if (dayContainer) {
     if (days.length === 0) {
-      dayContainer.innerHTML = `<span style="font-size: 0.82rem; color: var(--text-muted);">Sincroniza Google Sheets o pega datos del Panel para ver los días disponibles...</span>`;
+      dayContainer.innerHTML = `<span style="font-size: 0.82rem; color: var(--text-muted);">Sincroniza Google Sheets, Supabase o pega datos del Panel para ver los días disponibles...</span>`;
     } else {
       const btns = [];
-      days.forEach(d => {
+      const totalE = AppState.excelItems.length;
+      const totalP = AppState.panelItems.length;
+
+      const renderDayPill = (d) => {
         const eItems = AppState.excelItems.filter(e => e.fechaDia === d);
         const pItems = AppState.panelItems.filter(p => p.fechaDia === d);
         const isActive = activeDay === d;
@@ -106,7 +124,7 @@ function renderDayAndShiftBars() {
             rowRangeText = ` · ${parts.join(' + ')}`;
           }
         }
-        btns.push(`
+        return `
           <button
             class="day-pill-btn ${isActive ? 'active' : ''}"
             onclick="selectDayFilter('${escapeHtml(d)}')"
@@ -115,11 +133,38 @@ function renderDayAndShiftBars() {
             <span class="day-pill-main">📅 ${escapeHtml(d)}</span>
             <span class="day-pill-sub">${eItems.length} Sheets · ${pItems.length} Panel${rowRangeText}</span>
           </button>
-        `);
-      });
+        `;
+      };
 
-      const totalE = AppState.excelItems.length;
-      const totalP = AppState.panelItems.length;
+      if (days.length <= 4 || AppState.expandAllDaysBar) {
+        // Pocos días o barra expandida
+        days.forEach(d => btns.push(renderDayPill(d)));
+      } else {
+        // Vista amena y compacta: muestra el día activo + los más recientes + botón modal
+        const recentDays = days.slice(-3); // los 3 más recientes
+        const displayDaysSet = new Set(recentDays);
+        if (activeDay !== 'all' && days.includes(activeDay)) {
+          displayDaysSet.add(activeDay);
+        }
+
+        const daysToShow = days.filter(d => displayDaysSet.has(d));
+        daysToShow.forEach(d => btns.push(renderDayPill(d)));
+
+        // Botón para abrir el modal con la lista completa de días
+        btns.push(`
+          <button
+            type="button"
+            class="day-pill-btn day-pill-more-btn"
+            onclick="openRegisteredDaysModal()"
+            title="Ver los ${days.length} días registrados en la planilla en una ventana limpia"
+          >
+            <span class="day-pill-main" style="color: #7dd3fc;">🗓️ Ver los ${days.length} días...</span>
+            <span class="day-pill-sub" style="color: #94a3b8;">Abrir modal de días</span>
+          </button>
+        `);
+      }
+
+      // Botón "Todos los días"
       btns.push(`
         <button
           class="day-pill-btn ${activeDay === 'all' ? 'active' : ''}"
@@ -170,6 +215,97 @@ function renderDayAndShiftBars() {
       shiftContainer.innerHTML = sBtns.join('');
     }
   }
+}
+
+// =========================================================
+// MODAL DE DÍAS REGISTRADOS EN LA PLANILLA
+// =========================================================
+function openRegisteredDaysModal() {
+  const backdrop = document.getElementById('registeredDaysModalBackdrop');
+  if (!backdrop) return;
+
+  const days = getAvailableDays();
+  const activeDay = getResolvedActiveDay();
+  const sub = document.getElementById('registeredDaysModalSubtitle');
+  if (sub) {
+    sub.textContent = `${days.length} día(s) registrado(s) en la planilla · Hacé clic en cualquiera para comparar ese día.`;
+  }
+
+  const searchInput = document.getElementById('searchRegisteredDaysInput');
+  if (searchInput) searchInput.value = '';
+
+  renderRegisteredDaysGrid(days, activeDay);
+  backdrop.classList.add('open');
+}
+
+function closeRegisteredDaysModal() {
+  const backdrop = document.getElementById('registeredDaysModalBackdrop');
+  if (backdrop) backdrop.classList.remove('open');
+}
+
+function handleRegisteredDaysBackdropClick(e) {
+  if (e.target.id === 'registeredDaysModalBackdrop') {
+    closeRegisteredDaysModal();
+  }
+}
+
+function renderRegisteredDaysGrid(days, activeDay, filterText = '') {
+  const container = document.getElementById('registeredDaysGridContainer');
+  if (!container) return;
+
+  const query = (filterText || '').trim().toLowerCase();
+  // Mostrar los días en orden más reciente primero en el modal
+  const sortedDays = [...days].reverse();
+  const filteredDays = sortedDays.filter(d => !query || d.toLowerCase().includes(query));
+
+  if (filteredDays.length === 0) {
+    container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 24px;">No se encontraron días que coincidan con "${escapeHtml(filterText)}"</div>`;
+    return;
+  }
+
+  container.innerHTML = filteredDays.map(d => {
+    const eItems = AppState.excelItems.filter(e => e.fechaDia === d);
+    const pItems = AppState.panelItems.filter(p => p.fechaDia === d);
+    const isActive = activeDay === d;
+
+    let rowRangeText = '';
+    if (eItems.length > 0) {
+      const sheetsInDay = [...new Set(eItems.map(e => e.sheetName).filter(Boolean))];
+      if (sheetsInDay.length <= 1) {
+        const minR = Math.min(...eItems.map(e => e.excelRowNumber));
+        const maxR = Math.max(...eItems.map(e => e.excelRowNumber));
+        const prefix = (AppState.currentWorkbook && AppState.currentWorkbook.SheetNames && AppState.currentWorkbook.SheetNames.length > 1 && sheetsInDay[0])
+          ? `${sheetsInDay[0]}: ` : 'Filas ';
+        rowRangeText = `${prefix}#${minR}–#${maxR}`;
+      } else {
+        rowRangeText = `${sheetsInDay.length} hojas`;
+      }
+    }
+
+    return `
+      <button
+        type="button"
+        class="registered-day-card ${isActive ? 'active' : ''}"
+        onclick="selectDayFilter('${escapeHtml(d)}'); closeRegisteredDaysModal();"
+        title="Ver movimientos del día ${escapeHtml(d)}"
+      >
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <strong style="font-size: 1.05rem; color: ${isActive ? '#93c5fd' : '#ffffff'};">📅 ${escapeHtml(d)}</strong>
+          ${isActive ? '<span style="background: rgba(59, 130, 246, 0.25); color: #93c5fd; font-weight: 700; font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; border: 1px solid #3b82f6;">✔ Activo</span>' : ''}
+        </div>
+        <div style="font-size: 0.8rem; color: #94a3b8; font-family: 'Consolas', monospace;">
+          ${eItems.length} Sheets · ${pItems.length} Panel
+        </div>
+        ${rowRangeText ? `<div style="font-size: 0.74rem; color: #64748b; font-family: 'Consolas', monospace;">${escapeHtml(rowRangeText)}</div>` : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function filterRegisteredDaysList(val) {
+  const days = getAvailableDays();
+  const activeDay = getResolvedActiveDay();
+  renderRegisteredDaysGrid(days, activeDay, val);
 }
 
 function getActiveTypeFilter() {
@@ -265,6 +401,9 @@ function toggleCheck(key, checked, event) {
   if (AppState.isModalOpen && AppState.selectedRowKey === key) {
     renderComparisonModalContent();
   }
+
+  // Sincronizar y copiar automáticamente las filas seleccionadas/checkeadas al portapapeles
+  syncCheckedRowsToClipboard(checked);
 }
 
 function toggleSelectedCheck() {
@@ -303,6 +442,7 @@ function checkAllMatched() {
 function uncheckAll() {
   AppState.manualChecks = {};
   renderTable();
+  updateFloatingNav();
   showToast('🔄 Se desmarcaron todos los checks OK');
 }
 
@@ -387,8 +527,9 @@ async function quickFixSelectedUserName() {
 }
 
 // =========================================================
-// COPIAR LÍNEA FORMATEADA DEL PANEL (TECLA C / BOTÓN EN MODAL)
+// COPIAR LÍNEAS FORMATEADAS DEL PANEL (TECLA C / FLECHA DERECHA / BOTONES)
 // Formato: "HH:mm\tDD/MM/YYYY\tusuario\tmonto\tCarga (Depósito) / Retiro"
+// Permite copiar una fila individual o múltiples filas seleccionadas con OK
 // =========================================================
 function formatPanelLineForCopy(p) {
   if (!p) return '';
@@ -398,6 +539,32 @@ function formatPanelLineForCopy(p) {
   const monto = p.monto ?? 0;
   const tipoLabel = p.tipo === 'RETIRO' ? 'Retiro' : 'Carga (Depósito)';
   return `${horario}\t${fechaSolo}\t${usuario}\t${monto}\t${tipoLabel}`;
+}
+
+function formatRowForCopy(r) {
+  if (!r) return '';
+  if (r.panel) {
+    return formatPanelLineForCopy(r.panel);
+  }
+  if (r.excel) {
+    const e = r.excel;
+    const horario = e.hora || '';
+    const fechaSolo = e.fechaDia || '';
+    const usuario = e.usuarioOriginal || '';
+    const monto = e.monto ?? 0;
+    const tipoLabel = e.tipo === 'RETIRO' ? 'Retiro' : 'Carga (Depósito)';
+    return `${horario}\t${fechaSolo}\t${usuario}\t${monto}\t${tipoLabel}`;
+  }
+  return '';
+}
+
+function getCheckedRows() {
+  const visible = AppState.currentVisibleRows || AppState.comparisonResults || [];
+  // Mantener el orden visual de las filas en la tabla
+  const checked = visible.filter(r => AppState.manualChecks[r.key]);
+  if (checked.length > 0) return checked;
+  // Si no hay ninguna visible marcada, chequear sobre todo el resultado
+  return (AppState.comparisonResults || []).filter(r => AppState.manualChecks[r.key]);
 }
 
 function copyTextToClipboardWithFallback(text) {
@@ -424,24 +591,67 @@ function copyTextToClipboardWithFallback(text) {
 
 function copyPanelLineByKey(key) {
   const row = AppState.comparisonResults.find(r => r.key === key);
-  if (!row || !row.panel) {
-    showToast('⚠️ Esta fila no tiene datos del Panel para copiar');
+  if (!row || (!row.panel && !row.excel)) {
+    showToast('⚠️ Esta fila no tiene datos para copiar');
     return;
   }
-  const formatted = formatPanelLineForCopy(row.panel);
+  const formatted = formatRowForCopy(row);
   copyTextToClipboardWithFallback(formatted).then(() => {
-    showToast(`📋 Línea copiada: ${row.panel.timeStr} · ${row.panel.usuarioOriginal} · ${formatMoney(row.panel.monto)}`);
+    const userLabel = row.panel?.usuarioOriginal || row.excel?.usuarioOriginal || '';
+    const montoLabel = row.panel ? formatMoney(row.panel.monto) : formatMoney(row.excel?.monto);
+    showToast(`📋 Línea copiada: ${userLabel} · ${montoLabel}`);
   }).catch(() => {
     showToast('❌ No se pudo copiar al portapapeles');
   });
 }
 
 function copySelectedPanelLine() {
+  const checkedRows = getCheckedRows();
+  if (checkedRows.length > 0) {
+    const lines = checkedRows.map(r => formatRowForCopy(r)).filter(Boolean);
+    if (lines.length > 0) {
+      const textToCopy = lines.join('\n');
+      copyTextToClipboardWithFallback(textToCopy).then(() => {
+        if (checkedRows.length === 1) {
+          const r = checkedRows[0];
+          const userLabel = r.panel?.usuarioOriginal || r.excel?.usuarioOriginal || '1 fila';
+          showToast(`📋 1 fila copiada (${userLabel})`);
+        } else {
+          showToast(`📋 ${checkedRows.length} filas seleccionadas copiadas al portapapeles (listas para pegar)`);
+        }
+      }).catch(() => {
+        showToast('❌ No se pudo copiar al portapapeles');
+      });
+      return;
+    }
+  }
+
   if (!AppState.selectedRowKey) {
-    showToast('⚠️ Seleccioná una fila primero');
+    showToast('⚠️ Seleccioná o marcá filas con flecha derecha (→) para copiar');
     return;
   }
   copyPanelLineByKey(AppState.selectedRowKey);
+}
+
+function syncCheckedRowsToClipboard(justChecked) {
+  const checkedRows = getCheckedRows();
+  if (checkedRows.length > 0) {
+    const lines = checkedRows.map(r => formatRowForCopy(r)).filter(Boolean);
+    if (lines.length > 0) {
+      const textToCopy = lines.join('\n');
+      copyTextToClipboardWithFallback(textToCopy).then(() => {
+        if (checkedRows.length === 1) {
+          const r = checkedRows[0];
+          const info = r.panel ? `${r.panel.usuarioOriginal} · ${formatMoney(r.panel.monto)}` : (r.excel ? `${r.excel.usuarioOriginal} · ${formatMoney(r.excel.monto)}` : '1 fila');
+          showToast(`📋 ${info} copiado (1 seleccionado)`);
+        } else {
+          showToast(`📋 ${checkedRows.length} filas seleccionadas y copiadas (listas para pegar)`);
+        }
+      }).catch(() => {});
+    }
+  } else if (!justChecked) {
+    showToast('☑️ Fila desmarcada');
+  }
 }
 
 // =========================================================
@@ -506,8 +716,20 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Escape: Cerrar modal si está abierto
+    // Escape: Cerrar modales si están abiertos
     if (e.key === 'Escape') {
+      const regModal = document.getElementById('registeredDaysModalBackdrop');
+      if (regModal && regModal.classList.contains('open')) {
+        e.preventDefault();
+        closeRegisteredDaysModal();
+        return;
+      }
+      const daySyncModal = document.getElementById('daySyncModalBackdrop');
+      if (daySyncModal && daySyncModal.classList.contains('open')) {
+        e.preventDefault();
+        closeDaySyncModal();
+        return;
+      }
       if (AppState.isModalOpen) {
         e.preventDefault();
         closeComparisonModal();
@@ -557,7 +779,8 @@ function moveSelection(delta) {
 function updateFloatingNav() {
   const nav = document.getElementById('floatingNav');
   const rows = AppState.currentVisibleRows;
-  if (rows.length === 0) {
+  if (!nav) return;
+  if (!rows || rows.length === 0) {
     nav.style.display = 'none';
     return;
   }
@@ -566,7 +789,40 @@ function updateFloatingNav() {
   const posText = idx !== -1
     ? `Movimiento ${idx + 1} de ${rows.length}`
     : `${rows.length} movimientos`;
-  document.getElementById('navPosLabel').textContent = posText;
+  const lbl = document.getElementById('navPosLabel');
+  if (lbl) lbl.textContent = posText;
+
+  const checkedRows = getCheckedRows();
+  const btnCopy = document.getElementById('btnFloatingCopyLine');
+  const btnClear = document.getElementById('btnFloatingClearChecks');
+
+  if (btnCopy) {
+    if (checkedRows.length > 1) {
+      btnCopy.innerHTML = `📋 Copiar <strong>${checkedRows.length}</strong> seleccionados <kbd>C</kbd>`;
+      btnCopy.style.borderColor = '#38bdf8';
+      btnCopy.style.background = 'rgba(56, 189, 248, 0.16)';
+      btnCopy.style.color = '#bae6fd';
+    } else if (checkedRows.length === 1) {
+      btnCopy.innerHTML = `📋 Copiar <strong>1</strong> seleccionado <kbd>C</kbd>`;
+      btnCopy.style.borderColor = '#38bdf8';
+      btnCopy.style.background = 'rgba(56, 189, 248, 0.1)';
+      btnCopy.style.color = '#7dd3fc';
+    } else {
+      btnCopy.innerHTML = `📋 Copiar línea <kbd>C</kbd>`;
+      btnCopy.style.borderColor = '#38bdf8';
+      btnCopy.style.background = '';
+      btnCopy.style.color = '#7dd3fc';
+    }
+  }
+
+  if (btnClear) {
+    if (checkedRows.length > 0) {
+      btnClear.style.display = 'inline-flex';
+      btnClear.textContent = `✕ Limpiar (${checkedRows.length})`;
+    } else {
+      btnClear.style.display = 'none';
+    }
+  }
 }
 
 function onRowClick(key, event) {

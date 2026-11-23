@@ -1406,6 +1406,45 @@ tr.row-selected .user-highlight.user-highlight-retiro {
   font-family: 'Consolas', monospace;
 }
 
+.day-pill-more-btn {
+  border: 1px dashed #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.08) !important;
+}
+
+.day-pill-more-btn:hover {
+  border-color: #7dd3fc !important;
+  background: rgba(56, 189, 248, 0.16) !important;
+  transform: translateY(-1px);
+}
+
+.registered-day-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.registered-day-card:hover {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  transform: translateY(-1px);
+}
+
+.registered-day-card.active {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(59, 130, 246, 0.14));
+  box-shadow: 0 0 0 1px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
 .shift-pill-btn {
   padding: 5px 11px;
   border-radius: 999px;

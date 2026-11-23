@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <!-- Estilos separados -->
-  <link rel="stylesheet" href="css/styles.css?v=20261110" />
+  <link rel="stylesheet" href="css/styles.css?v=20261122" />
   <style>
     /* PANTALLA COMPLETAMENTE NEGRA Y LIMPIA (DOBLE CANDADO) */
     #adminAuthOverlay {
@@ -557,7 +557,10 @@
       <div class="day-selector-row">
         <div class="day-selector-label">
           <span>📅 Elegir Día:</span>
-          <span class="active-day-badge" id="activeDayHeaderBadge">Auto</span>
+          <span class="active-day-badge" id="activeDayHeaderBadge" onclick="if (typeof openRegisteredDaysModal === 'function') openRegisteredDaysModal()" style="cursor: pointer;" title="Clic para ver lista de días">Auto</span>
+          <button type="button" class="btn btn-outline" id="btnOpenDaysListModal" onclick="openRegisteredDaysModal()" style="display: none; padding: 2px 9px; font-size: 0.74rem; border-color: #38bdf8; color: #7dd3fc; border-radius: 6px; margin-left: 2px;" title="Ver lista completa de días registrados">
+            🗓️ Ver Lista
+          </button>
         </div>
         <div class="day-buttons-wrap" id="dayButtonsContainer">
           <span style="font-size: 0.82rem; color: var(--text-muted);">Detectando días en Google Sheets...</span>
@@ -765,8 +768,9 @@
     <button class="btn" onclick="moveSelection(1)" title="Bajar a la siguiente fila (Flecha Abajo)">⬇️ Siguiente</button>
     <div style="border-left: 1px solid var(--border); height: 22px;"></div>
     <button class="btn btn-outline" onclick="quickFixSelectedUserName()" style="border-color: #818cf8; color: #c7d2fe;" title="Corregir nombre de usuario mal escrito en Supabase (Flecha Izquierda ←)">✏️ Corregir Usuario <kbd>←</kbd></button>
-    <button class="btn btn-outline" onclick="copySelectedPanelLine()" style="border-color: #38bdf8; color: #7dd3fc;" title="Copiar línea formateada del Panel (Tecla C)">📋 Copiar línea <kbd>C</kbd></button>
-    <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK (Tecla Espacio o Flecha Derecha →)">☑️ Marcar OK</button>
+    <button class="btn btn-outline" id="btnFloatingCopyLine" onclick="copySelectedPanelLine()" style="border-color: #38bdf8; color: #7dd3fc;" title="Copiar líneas seleccionadas o del Panel (Tecla C)">📋 Copiar línea <kbd>C</kbd></button>
+    <button class="btn btn-outline" id="btnFloatingClearChecks" onclick="uncheckAll()" style="display: none; border-color: #64748b; color: #94a3b8; padding: 4px 8px; font-size: 0.75rem;" title="Desmarcar todas las filas seleccionadas">✕ Limpiar (0)</button>
+    <button class="btn btn-success" onclick="toggleSelectedCheck()" title="Marcar o desmarcar OK y copiar (Tecla Espacio o Flecha Derecha →)">☑️ Marcar OK <kbd>→</kbd></button>
     <button class="btn btn-primary" onclick="openComparisonModalForSelected()" title="Ver detalle comparativo (Doble Clic o Enter)">🔍 Comparar</button>
   </div>
 
@@ -1202,6 +1206,51 @@
 
       <div class="modal-footer" style="padding: 12px 22px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border);">
         <button class="btn btn-outline" onclick="closeDaySyncModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- MODAL DE DÍAS REGISTRADOS EN LA PLANILLA                   -->
+  <!-- ========================================================= -->
+  <div class="modal-backdrop" id="registeredDaysModalBackdrop" onclick="handleRegisteredDaysBackdropClick(event)">
+    <div class="modal-card" style="max-width: 640px; border-color: #38bdf8; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65);">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">🗓️</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; color: #7dd3fc;">Días Registrados</h3>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);" id="registeredDaysModalSubtitle">
+              Seleccioná un día para comparar
+            </p>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeRegisteredDaysModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 20px; max-height: 60vh; overflow-y: auto;">
+        <!-- Buscador rápido si hay muchos días -->
+        <div style="margin-bottom: 14px;">
+          <input
+            type="text"
+            id="searchRegisteredDaysInput"
+            class="form-input"
+            placeholder="🔍 Buscar día por fecha (ej: 22/11)..."
+            oninput="filterRegisteredDaysList(this.value)"
+            style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border-radius: 8px; border: 1px solid var(--border);"
+          />
+        </div>
+
+        <div id="registeredDaysGridContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px;">
+          <!-- Se llena dinámicamente con las tarjetas de días -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="btn btn-outline" onclick="selectDayFilter('all'); closeRegisteredDaysModal();" style="border-color: #475569; color: #cbd5e1; font-size: 0.84rem;">
+          🗂️ Ver Todos los Días Juntos
+        </button>
+        <button class="btn btn-outline" onclick="closeRegisteredDaysModal()">Cerrar</button>
       </div>
     </div>
   </div>
@@ -1842,10 +1891,10 @@
       }
     });
   </script>
-  <script src="js/parsers.js?v=20261110"></script>
-  <script src="js/matcher.js?v=20261110"></script>
-  <script src="js/ui.js?v=20261110"></script>
-  <script src="js/pdf.js?v=20261110"></script>
-  <script src="js/tour.js?v=20261110"></script>
+  <script src="js/parsers.js?v=20261122"></script>
+  <script src="js/matcher.js?v=20261122"></script>
+  <script src="js/ui.js?v=20261122"></script>
+  <script src="js/pdf.js?v=20261122"></script>
+  <script src="js/tour.js?v=20261122"></script>
 </body>
 </html>
